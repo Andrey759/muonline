@@ -43,6 +43,10 @@ namespace Client.Main.Scenes
         private bool _loginRequestPending;
         private bool _loginAccepted;
 
+        // Quick login (MuOnlineSettings.QuickLogin) runs once per client run, not on every return to this scene.
+        private static bool s_quickLoginDone;
+        private bool _quickLoginServerRequested;
+
         // Constructors
         public LoginScene()
         {
@@ -371,7 +375,51 @@ namespace Client.Main.Scenes
 
                 _previousStateHandled = newState;
                 _logger.LogDebug("<<< HandleConnectionStateChange (UI Thread): Finished applying visibility. State handled: {NewState}", newState);
+
+                ContinueQuickLogin(newState);
             });
+        }
+
+        /// <summary>
+        /// Drives the optional quick login (<see cref="QuickLoginSettings"/>): connects to the configured server as
+        /// soon as the server list is known, then sends the stored credentials. It runs only once per client run,
+        /// so after a logout or a failed login the player logs in through the dialog as usual.
+        /// </summary>
+        private void ContinueQuickLogin(ClientConnectionState state)
+        {
+            var settings = MuGame.AppSettings?.QuickLogin;
+            if (s_quickLoginDone || settings is not { Enabled: true } || string.IsNullOrWhiteSpace(settings.Username)
+                || Client.Main.Diagnostics.AutoLogin.Enabled)
+            {
+                return;
+            }
+
+            if (state == ClientConnectionState.ReceivedServerList && !_quickLoginServerRequested)
+            {
+                var servers = _networkManager.GetCachedServerList();
+                if (servers == null || servers.Count == 0)
+                {
+                    return;
+                }
+
+                var server = servers.FirstOrDefault(s => s.ServerId == settings.ServerId) ?? servers[0];
+                _quickLoginServerRequested = true;
+                _logger.LogInformation("Quick login: connecting to server {ServerId}.", server.ServerId);
+                if (_loginDialog != null)
+                {
+                    _loginDialog.ServerName = $"Server {server.ServerId}";
+                }
+
+                _ = _networkManager.RequestGameServerConnectionAsync(server.ServerId);
+            }
+            else if (state == ClientConnectionState.ConnectedToGameServer && _quickLoginServerRequested
+                     && !_loginRequestPending && !_loginAccepted)
+            {
+                s_quickLoginDone = true;
+                _logger.LogInformation("Quick login: logging in as {Username}.", settings.Username);
+                _loginRequestPending = true;
+                _ = _networkManager.SendLoginRequestAsync(settings.Username, settings.Password ?? string.Empty);
+            }
         }
 
         private void UpdateUIVisibility(bool showServerSelectionUi, bool showLoginDialog, bool hideAll)

@@ -154,6 +154,22 @@ namespace Client.Main.Configuration
         public GraphicsSettings Graphics { get; set; } = new();
         public EnvironmentSettings Environment { get; set; } = new();
         public UiSettings Ui { get; set; } = new();
+        public QuickLoginSettings QuickLogin { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Optional automatic login when the client starts: it connects to <see cref="ServerId"/> and logs in with
+    /// the stored credentials, once per client run; the character is still selected by the player.
+    /// The password is stored in plain text, so set this only in appsettings.local.json on your own computer.
+    /// </summary>
+    public class QuickLoginSettings
+    {
+        public bool Enabled { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+
+        /// <summary>The game server to connect to; the first listed server is used when it isn't listed.</summary>
+        public ushort ServerId { get; set; }
     }
 
     public class UiSettings
