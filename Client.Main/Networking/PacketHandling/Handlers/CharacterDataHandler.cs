@@ -23,6 +23,15 @@ namespace Client.Main.Networking.PacketHandling.Handlers
     /// </summary>
     public class CharacterDataHandler : IGamePacketHandler
     {
+        /// <summary>
+        /// The minimum length of a CharacterInformationExtended (C3 F3 03) packet whose fields are read below.
+        /// Current OpenMU servers send it with 93 bytes (Resets and MapDiscriminator were added at 90..92),
+        /// while the referenced packet library still declares 96. All fields read here end at index 88.
+        /// Checking against the declared length made the client fall back to the standard layout and read
+        /// money and experience from the wrong offsets.
+        /// </summary>
+        private const int CharacterInformationExtendedMinimumLength = 89;
+
         // ──────────────────────────── Fields ────────────────────────────
         private readonly ILogger<CharacterDataHandler> _logger;
         private readonly CharacterState _characterState;
@@ -157,7 +166,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 switch (_targetVersion)
                 {
                     case TargetProtocolVersion.Season6:
-                        if (packet.Length >= CharacterInformationExtended.Length)
+                        if (packet.Length >= CharacterInformationExtendedMinimumLength)
                         {
                             var info = new CharacterInformationExtended(packet);
                             mapId = info.MapId; x = info.X; y = info.Y;
