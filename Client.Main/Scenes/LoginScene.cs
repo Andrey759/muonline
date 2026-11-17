@@ -37,6 +37,12 @@ namespace Client.Main.Scenes
         private ILogger<LoginScene> _logger;
         private bool _uiInitialized = false; // Flag for one-time UI initialization
 
+        // A second submit of the login dialog (e.g. pressing Enter again while the character selection loads)
+        // would send another login on the same connection. The server answers it with AccountAlreadyConnected,
+        // and that error reaches the loading character selection scene, which then gets stuck.
+        private bool _loginRequestPending;
+        private bool _loginAccepted;
+
         // Constructors
         public LoginScene()
         {
@@ -407,6 +413,12 @@ namespace Client.Main.Scenes
 
         private void LoginDialog_LoginAttempt(object sender, EventArgs e)
         {
+            if (_loginRequestPending || _loginAccepted)
+            {
+                _logger.LogInformation("Login attempt ignored: a login is already {Status}.", _loginAccepted ? "accepted" : "in progress");
+                return;
+            }
+
             if (_networkManager.CurrentState == ClientConnectionState.ConnectedToGameServer ||
                 _networkManager.CurrentState == ClientConnectionState.Authenticating)
             {
@@ -418,6 +430,7 @@ namespace Client.Main.Scenes
                     return;
                 }
                 _logger.LogInformation("Login attempt from dialog for user: {Username}", username);
+                _loginRequestPending = true;
                 _ = _networkManager.SendLoginRequestAsync(username, password);
             }
             else
@@ -539,6 +552,8 @@ namespace Client.Main.Scenes
             MuGame.ScheduleOnMainThread(() =>
             {
                 _logger.LogInformation("UI received LoginSuccess.");
+                _loginRequestPending = false;
+                _loginAccepted = true;
                 if (_statusLabel != null) _statusLabel.Text = "Status: Logged In - Requesting Characters...";
             });
         }
@@ -548,6 +563,7 @@ namespace Client.Main.Scenes
             MuGame.ScheduleOnMainThread(() =>
             {
                 _logger.LogWarning("UI received LoginFailed. Reason: {Reason} (Value: {ReasonByte})", reason, (byte)reason);
+                _loginRequestPending = false;
                 if (_statusLabel != null) _statusLabel.Text = "Status: Login Failed!";
 
                 string messageToShow = reason == LoginResponse.LoginResult.AccountAlreadyConnected
@@ -563,6 +579,7 @@ namespace Client.Main.Scenes
             MuGame.ScheduleOnMainThread(() =>
             {
                 _logger.LogError("UI received NetworkError: {Error}", errorMessage);
+                _loginRequestPending = false;
                 MessageWindow.Show($"Network Error: {errorMessage}");
                 UpdateStatusLabel(ClientConnectionState.Disconnected); // This will trigger UI updates via HandleConnectionStateChange
             });
