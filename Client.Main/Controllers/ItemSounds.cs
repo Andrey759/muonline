@@ -8,7 +8,7 @@ namespace Client.Main.Controllers
     {
         public const string Move = "Sound/pGetItem.wav";
         public const string Sell = "Sound/pDropMoney.wav";
-        public const string Buy = "Sound/pGetItem.wav";
+        public const string Buy = "Sound/pDropMoney.wav";
 
         public static void PlayMove() => SoundController.Instance.PlayBuffer(Move);
         public static void PlaySell() => SoundController.Instance.PlayBuffer(Sell);

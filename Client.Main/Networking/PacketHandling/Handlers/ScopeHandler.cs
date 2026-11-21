@@ -1979,7 +1979,9 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         _scopeManager.AddOrUpdateItemInScope(maskedId, rawId, x, y, dataCopy);
                         _logger.LogDebug("Dropped Item: ID={Id:X4}, DataLen={Len}", maskedId, data.Length);
 
-                        string soundPath = ItemDatabase.IsGemstone(group, number)
+                        string soundPath = IsKundunItem(group, number, dataCopy)
+                            ? "Sound/kundunitem.wav"
+                            : ItemDatabase.IsGemstone(group, number)
                             ? "Sound/Jewel_Sound.wav"
                             : ItemDatabase.IsStandardJewel(group, number)
                                 ? "Sound/eGem.wav"
@@ -2051,6 +2053,10 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 _logger.LogWarning("Unsupported version for ItemsDropped (0x20): {Version}", _targetVersion);
             }
         }
+
+        /// <summary>Kundun items (Box of Kundun +1..+5, Symbol of Kundun, Lost Map) drop with the Kundun sound.</summary>
+        private static bool IsKundunItem(byte group, short number, byte[] data) =>
+            group == 14 && (number is 28 or 29 || (number == 11 && ItemDatabase.ParseItemDetails(data).Level >= 8));
 
         [PacketHandler(0x21, PacketRouter.NoSubCode)] // ItemDropRemoved
         public Task HandleItemDropRemovedAsync(Memory<byte> packet)

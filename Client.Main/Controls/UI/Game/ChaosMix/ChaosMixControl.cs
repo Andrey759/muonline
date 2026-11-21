@@ -874,6 +874,19 @@ namespace Client.Main.Controls.UI.Game
 
             _mixInProgress = true;
             _mixStartedAtMs = Environment.TickCount64;
+            long mixToken = _mixStartedAtMs;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(MixAnswerTimeoutMs);
+                MuGame.ScheduleOnMainThread(() =>
+                {
+                    if (!_mixInProgress || _mixStartedAtMs != mixToken) return;
+                    _mixInProgress = false;
+                    _mixRefreshPending = false;
+                    RefreshChaosMachineContent();
+                    _warningLine = "No answer from the server.";
+                });
+            });
             _mixRefreshPending = false;
             SoundController.Instance.PlayBuffer(MixWorkingSound);
 
@@ -892,7 +905,8 @@ namespace Client.Main.Controls.UI.Game
 
         // The machine "works" for a moment like in the original: the working sound plays, and the result (message,
         // sound, new mix box content) is shown when it ends, although the server answers at once.
-        private const int MixDurationMs = 2200;
+        private const int MixDurationMs = 4200;   // length of nMix.wav (4.26 s)
+        private const int MixAnswerTimeoutMs = 15000; // no answer (server restarted, connection lost): unlock the window
         private const string MixWorkingSound = "Sound/nMix.wav";
         private const string MixSuccessSound = "Sound/eMix.wav";
         private const string MixFailSound = "Sound/iButtonError.wav";
