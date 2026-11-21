@@ -58,7 +58,7 @@ namespace Client.Main.Controls.UI.Game.Character
             _ornateEmblem = CharacterClasses.EmblemFor(s.Class);
             _ornateLevel = s.MasterLevel > 0 ? $"Level {s.Level}   ·   Master {s.MasterLevel}" : $"Level {s.Level}";
 
-            ulong previous = s.Level > 1 ? (ulong)((s.Level - 1 + 9) * (s.Level - 1) * (s.Level - 1) * 10) : 0;
+            ulong previous = s.Level > 1 ? Client.Main.Core.Utilities.ExperienceTable.TotalForLevel(s.Level) : 0;
             ulong inLevel = s.Experience >= previous ? s.Experience - previous : 0;
             ulong needed = s.ExperienceForNextLevel > previous ? s.ExperienceForNextLevel - previous : 0;
             _ornateExpPct = needed > 0 ? MathHelper.Clamp((float)(inLevel / (double)needed), 0f, 1f) : 0f;

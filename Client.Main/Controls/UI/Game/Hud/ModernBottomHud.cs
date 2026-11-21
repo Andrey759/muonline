@@ -68,6 +68,9 @@ namespace Client.Main.Controls.UI.Game.Hud
         public const int ItemHotbarSlotCount = 5;
         private readonly (byte Group, int Id)?[] _potionAssignments = new (byte, int)?[ItemHotbarSlotCount];
         private readonly Dictionary<string, Texture2D> _potionTextureCache = new();
+        // Highest-level inventory stack per hotbar slot: its level gives the icon the same material glow as in the inventory.
+        private readonly InventoryItem?[] _potionSlotSamples = new InventoryItem?[ItemHotbarSlotCount];
+        private long _potionSamplesRefreshTick;
         private const int PotionIconCacheSize = 48; // fixed size for BMD preview caching
 
         // Classic uses its own five-slot item bar and two skill sets. These fields hold
@@ -411,8 +414,42 @@ namespace Client.Main.Controls.UI.Game.Hud
             }
         }
 
+        private void RefreshPotionSlotSamples()
+        {
+            long now = Environment.TickCount64;
+            if (now < _potionSamplesRefreshTick) return;
+            _potionSamplesRefreshTick = now + 500;
+
+            var items = _state.GetInventoryItems();
+            for (int i = 0; i < _potionAssignments.Length; i++)
+            {
+                var assignment = _potionAssignments[i];
+                if (assignment == null) { _potionSlotSamples[i] = null; continue; }
+
+                byte[]? best = null;
+                int bestLevel = 0;
+                ItemDefinition? bestDef = null;
+                foreach (var kvp in items)
+                {
+                    if (kvp.Key < 12) continue;
+                    var d = ItemDatabase.GetItemDefinition(kvp.Value);
+                    if (d == null || d.Group != assignment.Value.Group || d.Id != assignment.Value.Id) continue;
+                    int level = ItemDatabase.ParseItemDetails(kvp.Value).Level;
+                    if (level > bestLevel) { bestLevel = level; best = kvp.Value; bestDef = d; }
+                }
+
+                if (best == null || bestDef == null) { _potionSlotSamples[i] = null; continue; }
+                var current = _potionSlotSamples[i];
+                if (current != null && ReferenceEquals(current.Definition, bestDef) && current.Details.Level == bestLevel)
+                    continue;
+                _potionSlotSamples[i] = new InventoryItem(bestDef, Point.Zero, best, ItemDatabase.GetItemDurability(best), bestLevel);
+            }
+        }
+
         private void EnsurePotionIconsCached()
         {
+            RefreshPotionSlotSamples();
+
             // Pre-generate BMD previews (outside SpriteBatch scope) using fixed cache size
             for (int i = 0; i < PotionSlotCount; i++)
             {
@@ -421,7 +458,12 @@ namespace Client.Main.Controls.UI.Game.Hud
                 var def = ItemDatabase.GetItemDefinition(assignment.Value.Group, (short)assignment.Value.Id);
                 if (def?.TexturePath != null && def.TexturePath.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (BmdPreviewRenderer.TryGetCachedPreview(def, PotionIconCacheSize, PotionIconCacheSize) == null)
+                    if (_potionSlotSamples[i] is { } sample)
+                    {
+                        if (BmdPreviewRenderer.TryGetCachedPreview(sample, PotionIconCacheSize, PotionIconCacheSize) == null)
+                            BmdPreviewRenderer.GetPreview(sample, PotionIconCacheSize, PotionIconCacheSize);
+                    }
+                    else if (BmdPreviewRenderer.TryGetCachedPreview(def, PotionIconCacheSize, PotionIconCacheSize) == null)
                         BmdPreviewRenderer.GetPreview(def, PotionIconCacheSize, PotionIconCacheSize);
                 }
             }
@@ -1298,8 +1340,11 @@ namespace Client.Main.Controls.UI.Game.Hud
             var def = ItemDatabase.GetItemDefinition(group, (short)id);
             if (def == null) return;
 
-            // Draw item icon
-            Texture2D? tex = ResolveItemIcon(def);
+            // Draw item icon (with the inventory stack's level, so upgraded potions keep their glow)
+            Texture2D? tex = _potionSlotSamples[slotIndex] is { } sample &&
+                             def.TexturePath?.EndsWith(".bmd", StringComparison.OrdinalIgnoreCase) == true
+                ? BmdPreviewRenderer.TryGetCachedPreview(sample, PotionIconCacheSize, PotionIconCacheSize) ?? ResolveItemIcon(def)
+                : ResolveItemIcon(def);
             if (tex != null)
             {
                 int pad = 3;
@@ -1334,13 +1379,17 @@ namespace Client.Main.Controls.UI.Game.Hud
             }
         }
 
-        private void ConsumePotionInSlot(int slotIndex)
+        private void ConsumePotionInSlot(int slotIndex) => TryConsumePotionInSlot(slotIndex);
+
+        /// <summary>Uses the potion assigned to the Q/W/E slot, as the key does.</summary>
+        /// <returns><c>false</c>, when nothing is assigned or no such potion is in the inventory.</returns>
+        internal bool TryConsumePotionInSlot(int slotIndex)
         {
             if (slotIndex < 0 || slotIndex >= PotionSlotCount)
-                return;
+                return false;
 
             var assignment = _potionAssignments[slotIndex];
-            if (assignment == null) return;
+            if (assignment == null) return false;
 
             var (group, id) = assignment.Value;
 
@@ -1360,7 +1409,7 @@ namespace Client.Main.Controls.UI.Game.Hud
                 }
             }
 
-            if (foundSlot == null) return;
+            if (foundSlot == null) return false;
 
             // Play consumption sound
             var itemDef = ItemDatabase.GetItemDefinition(group, (short)id);
@@ -1381,6 +1430,7 @@ namespace Client.Main.Controls.UI.Game.Hud
                     MuGame.ScheduleOnMainThread(() => _state.RaiseInventoryChanged());
                 });
             }
+            return true;
         }
 
         private int CountPotionInInventory(byte group, int id)

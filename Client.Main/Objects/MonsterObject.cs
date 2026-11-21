@@ -414,6 +414,42 @@ namespace Client.Main.Objects
                 && Model.Actions[actionIndex] != null;
         }
 
+        private BMD _walkSyncModel;
+        private float _walkSyncKey = float.NaN;
+        private float _walkSyncMultiplier = 1f;
+
+        /// <summary>
+        /// Plays the walk cycle exactly as fast as the monster moves, so its planted feet do not skate:
+        /// the planted foot speed is measured from the model (see <see cref="WalkCycleCalibrator"/>).
+        /// Models without clearly measurable feet (flyers, crawlers) keep the authored speed.
+        /// </summary>
+        protected override float GetActionPlaybackMultiplier(int actionIndex, BMDTextureAction action)
+        {
+            if (actionIndex != (int)MonsterActionType.Walk || !Constants.SYNC_MONSTER_WALK_ANIMATION)
+                return 1f;
+
+            float playSpeed = action.PlaySpeed == 0 ? 1f : action.PlaySpeed;
+            float key = playSpeed * AnimationSpeed * TotalScale + MoveSpeed * 1000f;
+            if (ReferenceEquals(_walkSyncModel, Model) && key == _walkSyncKey)
+                return _walkSyncMultiplier;
+
+            _walkSyncModel = Model;
+            _walkSyncKey = key;
+            _walkSyncMultiplier = 1f;
+
+            float footSpeedPerKey = WalkCycleCalibrator.GetStanceSpeedPerKey(Model, actionIndex);
+            float keysPerSecond = playSpeed * AnimationSpeed;
+            if (footSpeedPerKey > 0f && keysPerSecond > 0f && TotalScale > 0f && MoveSpeed > 0f)
+            {
+                float multiplier = MoveSpeed / (footSpeedPerKey * TotalScale * keysPerSecond);
+                // Outside this range the measurement is more likely wrong than the authored speed.
+                if (multiplier is >= 0.4f and <= 3f)
+                    _walkSyncMultiplier = multiplier;
+            }
+
+            return _walkSyncMultiplier;
+        }
+
         protected void SetActionSpeed(MonsterActionType actionType, float speed)
         {
             int actionIndex = (int)actionType;

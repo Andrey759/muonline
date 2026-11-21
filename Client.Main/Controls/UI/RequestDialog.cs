@@ -359,6 +359,42 @@ namespace Client.Main.Controls.UI
             _staticSurface = null;
         }
 
+        /// <summary>
+        /// Enter presses the accept button (or the only button), Escape the reject button,
+        /// unless a text field takes the keys.
+        /// </summary>
+        public override void Update(GameTime gameTime)
+        {
+            base.Update(gameTime);
+            if (!Visible || Scene == null || Scene.IsTextInputActive)
+                return;
+
+            var keyboard = MuGame.Instance.Keyboard;
+            var previous = MuGame.Instance.PrevKeyboard;
+            if (keyboard.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.Enter) && previous.IsKeyUp(Microsoft.Xna.Framework.Input.Keys.Enter)
+                && !Scene.IsKeyboardEnterConsumedThisFrame)
+            {
+                Scene.ConsumeKeyboardEnter();
+                if (_acceptButton.Visible)
+                {
+                    Accepted?.Invoke(this, EventArgs.Empty);
+                }
+                else
+                {
+                    Rejected?.Invoke(this, EventArgs.Empty);
+                }
+
+                Close();
+            }
+            else if (keyboard.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.Escape) && previous.IsKeyUp(Microsoft.Xna.Framework.Input.Keys.Escape)
+                     && !Scene.IsKeyboardEscapeConsumedThisFrame)
+            {
+                Scene.ConsumeKeyboardEscape();
+                Rejected?.Invoke(this, EventArgs.Empty);
+                Close();
+            }
+        }
+
         // Consume clicks anywhere on the dialog (background or label), so they don't reach the world.
         public override bool OnClick()
         {

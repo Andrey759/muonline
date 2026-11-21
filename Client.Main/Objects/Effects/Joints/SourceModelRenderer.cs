@@ -161,6 +161,26 @@ namespace Client.Main.Objects.Effects.Joints
         /// <summary>Jumps the animation clock (in frames) - used to sync with the caster action.</summary>
         public void SetAnimationTime(double frame) => _animTime = Math.Max(0d, frame);
 
+        private bool _posePrimed;
+
+        // Effect models are small; CPU skinning keeps their first frame correct (see DrawInstance).
+        protected override bool AllowGpuSkinning => false;
+
+        private void PrimePose()
+        {
+            if (Model?.Actions == null || Model.Actions.Length == 0 || Model.Bones == null)
+                return;
+            int action = Math.Clamp(CurrentAction, 0, Model.Actions.Length - 1);
+            var act = Model.Actions[action];
+            if (act == null)
+                return;
+            int frames = Math.Max(act.LockPositions ? act.NumAnimationKeys - 1 : act.NumAnimationKeys, 1);
+            double pos = _animTime % frames;
+            int f0 = (int)pos;
+            GenerateBoneMatrix(action, f0, (f0 + 1) % frames, (float)(pos - f0));
+            InvalidateBuffers(MeshDirtyFlags.Animation);
+        }
+
         public override async Task Load()
         {
             Model = _presetModel ?? await BMDLoader.Instance.Prepare(_modelPath!);
@@ -239,6 +259,14 @@ namespace Client.Main.Objects.Effects.Joints
             Light = light;
             BlendMeshLight = blendMeshLight;
             Alpha = alpha;
+
+            // The first draw of a fresh renderer could show the meshes in their raw bind-pose coordinates for a frame
+            // (Hellfire circle flashed ahead of the caster): pose the bones explicitly before the first draw.
+            if (!_posePrimed)
+            {
+                _posePrimed = true;
+                PrimePose();
+            }
 
             // Buffers are only built in ModelObject.Update; this renderer is drawn without being ticked.
             EnsureDynamicBuffers();

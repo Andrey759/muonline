@@ -610,6 +610,45 @@ namespace Client.Main.Controls.UI.Game
             return true;
         }
 
+        /// <summary>First free place for the item on the visible vault page, as a server slot (quick move by right-click).</summary>
+        public bool TryFindFreeSlot(InventoryItem item, out byte serverSlot)
+        {
+            serverSlot = 0;
+            if (item?.Definition == null) return false;
+            for (int y = 0; y < VisibleRows; y++)
+            {
+                for (int x = 0; x < Columns; x++)
+                {
+                    var slot = new Point(x, y);
+                    if (CanPlaceAt(slot, item))
+                    {
+                        serverSlot = (byte)GetServerSlotForVisualSlot(slot);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>Right-click on a vault item moves it to the first free inventory place.</summary>
+        private void QuickMoveToInventory(InventoryItem item)
+        {
+            var inventory = InventoryControl.Instance;
+            if (item?.Definition == null || inventory == null || _networkManager == null) return;
+            if (!inventory.TryFindFreeGridSlot(item, out Point invSlot))
+            {
+                MessageWindow.Show("Inventory is full.");
+                return;
+            }
+
+            BeginDrag(item);
+            MoveItemToInventory(invSlot, inventory);
+            _draggedItem = null;
+            _draggedOriginalSlot = new Point(-1, -1);
+            _pendingDropSlot = new Point(-1, -1);
+            SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+        }
+
         // ═══════════════════════════════════════════════════════════════
         // DRAWING PRIMITIVES
         // ═══════════════════════════════════════════════════════════════
@@ -1243,7 +1282,7 @@ namespace Client.Main.Controls.UI.Game
                     ItemGridRenderHelper.DrawItemStackCount(spriteBatch, font, rect, item.Durability, Theme.TextGold, Alpha);
                 }
 
-                if (font != null && item.Details.Level > 0)
+                if (font != null && ItemGridRenderHelper.ShowsLevelBadge(item))
                 {
                     ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, pixel, font, rect, item.Details.Level,
                                        lvl => lvl >= 9 ? Theme.Danger :
@@ -1386,6 +1425,16 @@ namespace Client.Main.Controls.UI.Game
 
             bool leftJustPressed = mouse.LeftButton == ButtonState.Pressed &&
                                    prev.LeftButton == ButtonState.Released;
+            bool rightJustPressed = mouse.RightButton == ButtonState.Pressed &&
+                                    prev.RightButton == ButtonState.Released;
+
+            if (rightJustPressed && _draggedItem == null && _hoveredItem != null &&
+                InventoryControl.Instance?.GetDraggedItem() == null)
+            {
+                QuickMoveToInventory(_hoveredItem);
+                Scene?.SetMouseInputConsumed();
+                return;
+            }
 
             if (!leftJustPressed) return;
 

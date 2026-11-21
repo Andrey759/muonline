@@ -280,7 +280,7 @@ namespace Client.Main.Controls.UI.Game.Hud
                 return 0;
 
             ushort level = _state.Level;
-            ulong previous = level > 1 ? (ulong)((level - 1 + 9) * (level - 1) * (level - 1) * 10) : 0;
+            ulong previous = level > 1 ? Client.Main.Core.Utilities.ExperienceTable.TotalForLevel(level) : 0;
             ulong inLevel = _state.Experience >= previous ? _state.Experience - previous : 0;
             ulong needed = _state.ExperienceForNextLevel >= previous ? _state.ExperienceForNextLevel - previous : 1;
             return needed > 0 ? inLevel / (double)needed * 100.0 : 0.0;

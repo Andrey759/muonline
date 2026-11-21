@@ -117,7 +117,7 @@ namespace Client.Main.Controls.UI.Game
                 if (font != null && item.Definition.BaseDurability == 0 && item.Definition.MagicDurability == 0 && item.Durability > 1)
                     ItemGridRenderHelper.DrawItemStackCount(sb, font, rect, item.Durability, Theme.TextGold, alpha);
 
-                ItemGridRenderHelper.DrawItemLevelBadge(sb, pixel, font, rect, item.Details.Level,
+                ItemGridRenderHelper.DrawItemLevelBadge(sb, pixel, font, rect, ItemGridRenderHelper.ShowsLevelBadge(item) ? item.Details.Level : 0,
                     lvl => lvl >= 9 ? Theme.AccentBright : lvl >= 7 ? Theme.Accent : lvl >= 4 ? Theme.AccentDim : Theme.TextGray,
                     new Color(0, 0, 0, 180));
             }

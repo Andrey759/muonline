@@ -212,6 +212,10 @@ namespace Client.Main.Scenes
 
             // Space bar to pick up nearest item in range
             hotkeys.OnKeyPressed(Keys.Space, PickupNearestItem, when: WhenNotUiInput);
+
+            // Personal server helper: Home = auto farm on the current tile, End = auto pickup.
+            hotkeys.OnKeyPressed(Keys.Home, context => _scene.AutoHelper?.ToggleFarm(), when: WhenNotUiInput);
+            hotkeys.OnKeyPressed(Keys.End, context => _scene.AutoHelper?.TogglePickup(), when: WhenNotUiInput);
         }
 
         private void TogglePauseMenu(HotkeyContext context)

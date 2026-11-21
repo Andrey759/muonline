@@ -98,6 +98,7 @@ namespace Client.Main.Scenes
         private Texture2D _backgroundTexture;
         private LoadingScreenView _loadingView;
         private GameSceneSkillController _skillController;
+        private GameSceneAutoHelper _autoHelper;
         private GameSceneNotificationController _notificationController;
         private GameScenePlayerMenuController _playerMenuController;
         private GameSceneHotkeys _hotkeys;
@@ -128,6 +129,7 @@ namespace Client.Main.Scenes
         public PauseMenuControl PauseMenu => _pauseMenu;
         internal ModernBottomHud ModernHud => _modernHud;
         internal GameSceneSkillController SkillController => _skillController;
+        internal GameSceneAutoHelper AutoHelper => _autoHelper;
         internal Controls.UI.Game.Skills.MasterSkillTreeControl MasteryTree => _masteryTree;
         internal MasteryTreeControl ClassicMasteryTree => _classicMasteryTree;
 
@@ -272,6 +274,7 @@ namespace Client.Main.Scenes
             Controls.Add(QuestDialogControl.Instance);
             Controls.Add(DevilSquareEnterControl.Instance);
             Controls.Add(BloodCastleEnterControl.Instance);
+            Controls.Add(LahapJewelMixControl.Instance);
             Controls.Add(BloodCastleTimeControl.Instance);
             Controls.Add(BloodCastleResultControl.Instance);
             PlayerShop = new PlayerShopControl();
@@ -430,6 +433,7 @@ namespace Client.Main.Scenes
                 _modernHud,
                 _logger,
                 _duelController.IsDuelAttackTarget);
+            _autoHelper = new GameSceneAutoHelper(this, _logger);
             ApplyUiThemeVisibility();
 
             _currentLocationControl = new CurrentLocationControl(characterState);
@@ -948,6 +952,8 @@ namespace Client.Main.Scenes
             long rightClickSkillStarted = UpdatePassProfiler.Start();
             _skillController?.HandleRightClickSkillUsage();
             UpdatePassProfiler.AddGameRightClickSkill(rightClickSkillStarted);
+
+            _autoHelper?.Update(gameTime);
 
             long hotkeysStarted = UpdatePassProfiler.Start();
             _hotkeys?.HandleInWorld(currentKeyboardState, previousKeyboardState);

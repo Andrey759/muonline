@@ -24,6 +24,24 @@ namespace Client.Main.Objects
             MonsterMaterial = 3,
         }
 
+        /// <summary>
+        /// Samples textures clamped instead of wrapped. For meshes built from one corner of a mirrored texture
+        /// (e.g. the Hellfire circle): wrapping bleeds the bright opposite edge onto the outer border as a square.
+        /// </summary>
+        public bool ClampTextureSampling { get; set; }
+
+        private void ApplyModelSampler(GraphicsDevice graphicsDevice)
+        {
+            if (!ClampTextureSampling)
+            {
+                ApplyQualityModelSampler(graphicsDevice);
+                return;
+            }
+            SamplerState sampler = GraphicsManager.GetQualityLinearSamplerState();
+            if (!ReferenceEquals(graphicsDevice.SamplerStates[0], sampler))
+                graphicsDevice.SamplerStates[0] = sampler;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void ApplyQualityModelSampler(GraphicsDevice graphicsDevice)
         {
@@ -477,8 +495,14 @@ namespace Client.Main.Objects
         /// </summary>
         protected virtual bool ShouldApplyItemMaterial(int meshIndex)
         {
-            // By default, apply to all meshes
-            // Override in specific classes to exclude certain meshes
+            // Additive effect meshes (rings, flares: a sprite on a black background) keep their own look: the item
+            // material glow covers the whole polygon and turns them into bright squares (Staff of Resurrection +9).
+            // The first mesh is the item body and keeps the glow even when it is drawn additively.
+            // Override in specific classes to exclude further meshes.
+            if (meshIndex > 0 && Model?.Meshes != null && (uint)meshIndex < (uint)Model.Meshes.Length &&
+                (IsBlendMesh(meshIndex) ||
+                 string.Equals(Model.Meshes[meshIndex].BlendingMode, "Additive", StringComparison.OrdinalIgnoreCase)))
+                return false;
             return true;
         }
 
@@ -983,7 +1007,7 @@ namespace Client.Main.Objects
                         var passes = effect.CurrentTechnique.Passes;
                         for (int p = 0; p < passes.Count; p++)
                             passes[p].Apply();
-                        ApplyQualityModelSampler(gd);
+                        ApplyModelSampler(gd);
                     }
 
                     // Draw all meshes in this state group
@@ -1032,7 +1056,7 @@ namespace Client.Main.Objects
                                     var passes = effect.CurrentTechnique.Passes;
                                     for (int p = 0; p < passes.Count; p++)
                                         passes[p].Apply();
-                                    ApplyQualityModelSampler(gd);
+                                    ApplyModelSampler(gd);
                                 }
                             }
                             else
@@ -1114,7 +1138,7 @@ namespace Client.Main.Objects
                 for (int passIndex = 0; passIndex < passCount; passIndex++)
                 {
                     effect.CurrentTechnique.Passes[passIndex].Apply();
-                    ApplyQualityModelSampler(gd);
+                    ApplyModelSampler(gd);
                     gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, primitiveCount);
                 }
 
@@ -1665,7 +1689,7 @@ namespace Client.Main.Objects
                             bindings.TextureCoordinateOffset?.SetValue(Vector2.Zero);
                             bindings.AdditiveAlphaCutoff?.SetValue(GetAdditiveAlphaCutoff(blendState));
                             additiveTechnique.Passes[0].Apply();
-                            ApplyQualityModelSampler(gd);
+                            ApplyModelSampler(gd);
                             gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, primitiveCount);
                         }
                         finally
@@ -1689,7 +1713,7 @@ namespace Client.Main.Objects
                         for (int p = 0; p < passCount; p++)
                         {
                             passes[p].Apply();
-                            ApplyQualityModelSampler(gd);
+                            ApplyModelSampler(gd);
                             gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, primitiveCount);
                         }
 
@@ -1913,7 +1937,7 @@ namespace Client.Main.Objects
                         RegisterGpuSkinnedMeshDraw();
 
                     effect.CurrentTechnique.Passes[0].Apply();
-                    ApplyQualityModelSampler(gd);
+                    ApplyModelSampler(gd);
                     gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, primitiveCount);
 
                 }
@@ -2027,7 +2051,7 @@ namespace Client.Main.Objects
                         RegisterGpuSkinnedMeshDraw();
 
                     effect.CurrentTechnique.Passes[0].Apply();
-                    ApplyQualityModelSampler(gd);
+                    ApplyModelSampler(gd);
                     gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, primitiveCount);
 
                 }
@@ -2153,7 +2177,7 @@ namespace Client.Main.Objects
                     int primitiveCount = indexBuffer.IndexCount / 3;
 
                     effect.CurrentTechnique.Passes[0].Apply();
-                    ApplyQualityModelSampler(gd);
+                    ApplyModelSampler(gd);
                     gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, primitiveCount);
 
                     if (IsDepthWritingCutout(mesh, isBlendMesh))

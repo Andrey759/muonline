@@ -1548,6 +1548,47 @@ namespace Client.Main.Networking.Services
         }
 
         /// <summary>
+        /// Sends a Lahap jewel mix request (C1 BC): combines single jewels into a pack or unpacks a pack.
+        /// The server accepts it only while the Lahap NPC dialog is open.
+        /// </summary>
+        /// <param name="operation">Mix (combine) or Unmix (unpack).</param>
+        /// <param name="item">The jewel mix number (0 = Bless ... 9 = Higher Refine Stone).</param>
+        /// <param name="stackSize">Number of jewels to combine (used for Mix).</param>
+        /// <param name="unmixSourceSlot">Inventory slot of the pack (used for Unmix).</param>
+        public async Task SendLahapJewelMixRequestAsync(
+            LahapJewelMixRequest.MixType operation,
+            LahapJewelMixRequest.ItemType item,
+            LahapJewelMixRequest.StackSize stackSize,
+            byte unmixSourceSlot)
+        {
+            if (!_connectionManager.IsConnected)
+            {
+                _logger.LogError("Not connected - cannot send Lahap jewel mix request.");
+                return;
+            }
+
+            _logger.LogInformation("Sending LahapJewelMixRequest: Operation={Operation}, Item={Item}, StackSize={StackSize}, Slot={Slot}",
+                operation, item, stackSize, unmixSourceSlot);
+            try
+            {
+                await _connectionManager.Connection.SendAsync(() =>
+                {
+                    var len = LahapJewelMixRequest.Length;
+                    var packet = new LahapJewelMixRequest(_connectionManager.Connection.Output.GetMemory(len).Slice(0, len));
+                    packet.Operation = operation;
+                    packet.Item = item;
+                    packet.MixingStackSize = stackSize;
+                    packet.UnmixingSourceSlot = unmixSourceSlot;
+                    return len;
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending LahapJewelMixRequest.");
+            }
+        }
+
+        /// <summary>
         /// Sends a chaos machine mix request (C1 86) with a mix type id.
         /// </summary>
         public async Task SendChaosMachineMixRequestAsync(int mixType, byte socketSlot)

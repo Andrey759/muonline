@@ -216,7 +216,7 @@ namespace Client.Main.Objects
                 return;
             }
 
-            _animTime += delta * (action.PlaySpeed == 0 ? 1.0f : action.PlaySpeed) * AnimationSpeed;
+            _animTime += delta * (action.PlaySpeed == 0 ? 1.0f : action.PlaySpeed) * AnimationSpeed * GetActionPlaybackMultiplier(currentActionIndex, action);
             double framePos;
 
             if (isDeathAction || HoldOnLastFrame)
@@ -896,6 +896,12 @@ namespace Client.Main.Objects
         /// Default returns the input bones unchanged.
         /// Useful for lightweight procedural deformations (e.g., cape flutter).
         /// </summary>
+        /// <summary>
+        /// Extra per-instance playback factor for an action (1 = as authored). Walkers use it to keep walking feet
+        /// in step with their movement speed.
+        /// </summary>
+        protected virtual float GetActionPlaybackMultiplier(int actionIndex, BMDTextureAction action) => 1f;
+
         protected virtual Matrix[] GetRenderBoneTransforms(Matrix[] bones)
         {
             return bones;

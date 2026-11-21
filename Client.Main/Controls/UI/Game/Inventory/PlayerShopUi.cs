@@ -263,7 +263,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             if (item.Definition.BaseDurability == 0 && item.Definition.MagicDurability == 0 && item.Durability > 1)
                 ItemGridRenderHelper.DrawItemStackCount(sb, GraphicsManager.Instance.Font, rect, item.Durability, ModernHudTheme.TextGold, alpha);
 
-            if (item.Details.Level > 0)
+            if (ItemGridRenderHelper.ShowsLevelBadge(item))
                 ItemGridRenderHelper.DrawItemLevelBadge(sb, pixel, GraphicsManager.Instance.Font, rect, item.Details.Level,
                     level => level >= 9 ? ModernHudTheme.Danger : level >= 7 ? ModernHudTheme.Accent :
                              level >= 4 ? ModernHudTheme.AccentDim : ModernHudTheme.TextGray,

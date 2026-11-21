@@ -101,6 +101,11 @@ namespace Client.Main.Controls.UI.Game.Common
                                    0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
         }
 
+        /// <summary>Stackable items (potions, ammo) show their count in the corner; their level stays in the tooltip.</summary>
+        public static bool ShowsLevelBadge(InventoryItem item) =>
+            item != null && item.Details.Level > 0 && item.Definition != null &&
+            !(item.Definition.BaseDurability == 0 && item.Definition.MagicDurability == 0);
+
         public static void DrawItemLevelBadge(SpriteBatch spriteBatch, Texture2D pixel, SpriteFont font, Rectangle rect, int level, Func<int, Color> levelColorSelector, Color shadowColor)
         {
             if (font == null || level <= 0 || pixel == null) return;

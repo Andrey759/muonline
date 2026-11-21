@@ -800,7 +800,7 @@ namespace Client.Main.Controls.UI.Game
                     ItemGridRenderHelper.DrawItemStackCount(spriteBatch, font, rect, item.Durability, Theme.TextGold, Alpha);
                 }
 
-                ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, GraphicsManager.Instance.Pixel, font, rect, item.Details.Level,
+                ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, GraphicsManager.Instance.Pixel, font, rect, ItemGridRenderHelper.ShowsLevelBadge(item) ? item.Details.Level : 0,
                lvl => lvl >= 9 ? Theme.AccentBright :
                       lvl >= 7 ? Theme.Accent :
                       lvl >= 4 ? Theme.AccentDim :

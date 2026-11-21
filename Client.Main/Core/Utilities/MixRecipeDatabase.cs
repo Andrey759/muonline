@@ -317,6 +317,18 @@ namespace Client.Main.Core.Utilities
 
             int numSources = br.ReadInt32();
 
+            if (s_upgradeBaseRates.ContainsKey(recipe.MixId))
+            {
+                // This server allows several Jewels of Chaos for the +10 to +15 upgrades (see CalcMixRate).
+                for (int i = 0; i < sources.Length; i++)
+                {
+                    if (sources[i].TypeMin == JewelOfChaosType && sources[i].TypeMax == JewelOfChaosType)
+                    {
+                        sources[i] = sources[i] with { CountMax = MaxChaosJewelsForUpgrade };
+                    }
+                }
+            }
+
             return recipe with
             {
                 MaxSuccessRate = maxSuccessRate,
@@ -421,7 +433,7 @@ namespace Client.Main.Core.Utilities
                     IsCharmItem = isCharm,
                     IsChaosCharmItem = isChaosCharm,
                     MixLuck = it.Details.HasLuck,
-                    MixValue = EvaluateMixItemValue(type, it.Definition)
+                    MixValue = EvaluateMixItemValue(type, it)
                 });
             }
 
@@ -548,8 +560,30 @@ namespace Client.Main.Core.Utilities
             }
         }
 
+        // Server-side rates of the +10 to +15 upgrades (mix id → base percent): +25 % with luck,
+        // +10 % per additional Jewel of Chaos, capped at 100 %.
+        private static readonly Dictionary<int, int> s_upgradeBaseRates = new()
+        {
+            [3] = 60, [4] = 60, [22] = 55, [23] = 55, [49] = 50, [50] = 50,
+        };
+
+        private const short JewelOfChaosType = (12 * 512) + 15;
+        private const int MaxChaosJewelsForUpgrade = 10;
+
         private static int CalcMixRate(MixRecipe recipe, List<MixItem> mixItems, MixEvalState state)
         {
+            if (s_upgradeBaseRates.TryGetValue(recipe.MixId, out var upgradeRate))
+            {
+                int chaosJewels = mixItems.Where(i => i.Type == JewelOfChaosType).Sum(i => i.Count);
+                upgradeRate += 10 * Math.Max(0, chaosJewels - 1);
+                if (mixItems.Any(i => i.MixLuck))
+                {
+                    upgradeRate += 25;
+                }
+
+                return Math.Clamp(upgradeRate, 0, 100);
+            }
+
             // Charm bonus (only type 'A' in original)
             int totalCharmBonus = 0;
             for (int i = 0; i < mixItems.Count; i++)
@@ -739,7 +773,7 @@ namespace Client.Main.Core.Utilities
             return recipes[0];
         }
 
-        private static uint EvaluateMixItemValue(short type, ItemDefinition definition)
+        private static uint EvaluateMixItemValue(short type, InventoryItem item)
         {
             // Based on SourceMain5.2/source/MixMgr.cpp::EvaluateMixItemValue
             // Types are (Group * 512) + Id.
@@ -756,7 +790,9 @@ namespace Client.Main.Core.Utilities
                 7182 => 70000,
                 7190 => 450000,
                 7184 => 0,
-                _ => (uint)Math.Max(0, definition?.ItemValue ?? 0)
+                // Other items count with the buying price of this very item (level, options, luck), as the server does
+                // (ItemPriceCalculator.CalculateFinalOldBuyingPrice); the static ItemValue of the definition is 0 for most items.
+                _ => item == null ? 0u : (uint)Math.Max(0, ItemPriceCalculator.CalculateBuyPrice(item))
             };
         }
     }

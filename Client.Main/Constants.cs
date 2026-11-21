@@ -147,6 +147,8 @@ namespace Client.Main
         public static bool CONTINUOUS_PATH_WALK = true;
         /// <summary>Walkers cut the corners of their tile path instead of zigzagging from tile centre to tile centre.</summary>
         public static bool SMOOTH_PATH_CORNERS = true;
+        // Scale each monster's walk cycle so its planted feet move exactly as fast as the monster walks (no skating).
+        public static bool SYNC_MONSTER_WALK_ANIMATION = true;
         /// <summary>The camera follows the hero's height smoothly instead of every terrain step.</summary>
         public static bool SMOOTH_CAMERA_HEIGHT = true;
 

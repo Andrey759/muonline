@@ -254,10 +254,19 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         BloodCastleEnterControl.Instance.ShowWindow();
                     });
                 }
+                else if (resp.Window == NpcWindowResponse.NpcWindow.Lahap)
+                {
+                    // The NPC dialog stays open: the server accepts jewel mix requests only while talking to Lahap.
+                    // The window sends CloseNpcRequest when it closes.
+                    MuGame.ScheduleOnMainThread(() =>
+                    {
+                        LahapJewelMixControl.Instance.ShowWindow();
+                    });
+                }
                 else
                 {
                     // e.g. IllusionTemple, LugardDoppelgangerEntry, JerintGaionEvententry, SeedMaster,
-                    // Lahap, PetTrainer – the NPC talk succeeded but the client has no window for it yet.
+                    // PetTrainer – the NPC talk succeeded but the client has no window for it yet.
                     _logger.LogInformation("NPC window {Window} ({Id}) has no client UI yet; closing the NPC dialog.", resp.Window, (byte)resp.Window);
                     if (resp.Window == NpcWindowResponse.NpcWindow.IllusionTemple)
                         MuGame.ScheduleOnMainThread(() => RequestDialog.ShowInfo("Illusion Temple is not available on this server yet."));

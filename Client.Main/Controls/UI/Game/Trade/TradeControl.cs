@@ -1026,7 +1026,7 @@ namespace Client.Main.Controls.UI.Game.Trade
                     ItemGridRenderHelper.DrawItemStackCount(spriteBatch, font, rect, item.Durability, Theme.TextGold, Alpha);
                 }
 
-                if (font != null && item.Details.Level > 0)
+                if (font != null && ItemGridRenderHelper.ShowsLevelBadge(item))
                 {
                     ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, pixel, font, rect, item.Details.Level,
                                        lvl => lvl >= 9 ? Theme.Danger :
@@ -1087,7 +1087,7 @@ namespace Client.Main.Controls.UI.Game.Trade
                     ItemGridRenderHelper.DrawItemStackCount(spriteBatch, font, rect, item.Durability, Theme.TextGold, Alpha);
                 }
 
-                if (font != null && item.Details.Level > 0)
+                if (font != null && ItemGridRenderHelper.ShowsLevelBadge(item))
                 {
                     ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, pixel, font, rect, item.Details.Level,
                                        lvl => lvl >= 9 ? Theme.Danger :

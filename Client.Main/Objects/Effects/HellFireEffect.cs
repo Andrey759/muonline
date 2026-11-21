@@ -83,6 +83,7 @@ namespace Client.Main.Objects.Effects
             {
                 _circleModel.AnimationSpeed = 0f;
                 _circleModel.UseNormalBlend();
+                _circleModel.ClampTextureSampling = true;
             }
             if (_lightModel != null)
             {

@@ -554,6 +554,84 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         public bool CanPlaceAt(Point gridSlot, InventoryItem item) => CanPlaceItem(item, gridSlot);
 
+        /// <summary>First free inventory place for the item (quick move from the vault by right-click).</summary>
+        public bool TryFindFreeGridSlot(InventoryItem item, out Point slot)
+        {
+            slot = new Point(-1, -1);
+            if (item?.Definition == null) return false;
+            for (int y = 0; y < Rows; y++)
+            {
+                for (int x = 0; x < Columns; x++)
+                {
+                    var candidate = new Point(x, y);
+                    if (CanPlaceItem(item, candidate))
+                    {
+                        slot = candidate;
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>Right-click with the vault open moves the item to the first free vault place.</summary>
+        private void QuickMoveToVault(InventoryItem item, byte slotIndex)
+        {
+            var vault = VaultControl.Instance;
+            if (item?.Definition == null || vault == null || _networkManager == null) return;
+            if (!vault.TryFindFreeSlot(item, out byte toSlot))
+            {
+                MessageWindow.Show("Vault is full.");
+                return;
+            }
+
+            QuickMoveToStorage(item, slotIndex, ItemStorageKind.Vault, toSlot);
+        }
+
+        /// <summary>Right-click with the chaos machine open moves the item to the first free mix box place.</summary>
+        private void QuickMoveToChaosMachine(InventoryItem item, byte slotIndex)
+        {
+            var chaos = Client.Main.Controls.UI.Game.ChaosMixControl.Instance;
+            if (item?.Definition == null || chaos == null || _networkManager == null) return;
+            if (!chaos.TryFindFreeSlot(item, out byte toSlot))
+            {
+                MessageWindow.Show("Chaos machine is full.");
+                return;
+            }
+
+            QuickMoveToStorage(item, slotIndex, ItemStorageKind.ChaosMachine, toSlot);
+        }
+
+        private void QuickMoveToStorage(InventoryItem item, byte slotIndex, ItemStorageKind targetKind, byte toSlot)
+        {
+            var svc = _networkManager.GetCharacterService();
+            var raw = item.RawData ?? Array.Empty<byte>();
+            var state = _networkManager.GetCharacterState();
+            var version = _networkManager.TargetVersion;
+            state.StashPendingInventoryMove(slotIndex, slotIndex);
+            RemoveItemFromGrid(item);
+            _items.Remove(item);
+            if (ReferenceEquals(_hoveredItem, item)) _hoveredItem = null;
+            SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+
+            _ = Task.Run(async () =>
+            {
+                await svc.SendStorageItemMoveAsync(ItemStorageKind.Inventory, slotIndex, targetKind, toSlot, version, raw);
+                await Task.Delay(1200);
+                if (_networkManager != null && state.IsInventoryMovePending(slotIndex, slotIndex))
+                {
+                    MuGame.ScheduleOnMainThread(() =>
+                    {
+                        state.RaiseInventoryChanged();
+                        if (targetKind == ItemStorageKind.ChaosMachine)
+                            state.RaiseChaosMachineItemsChanged();
+                        else
+                            state.RaiseVaultItemsChanged();
+                    });
+                }
+            });
+        }
+
         public override void Update(GameTime gameTime)
         {
             _currentGameTime = gameTime;
@@ -1526,7 +1604,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 if (leftJustPressed)
                 {
                     // Check if there's an item from VaultControl being dragged
-                    var vaultDraggedItem = VaultControl.Instance?.GetDraggedItem();
+                    var vaultDraggedItem = VaultControl.Instance?.GetDraggedItem()
+                                           ?? Client.Main.Controls.UI.Game.ChaosMixControl.Instance?.GetDraggedItem();
                     if (vaultDraggedItem != null && _pickedItemRenderer.Item == null)
                     {
                         // VaultControl will handle the drop via its own AttemptDrop logic
@@ -1656,6 +1735,33 @@ namespace Client.Main.Controls.UI.Game.Inventory
                     {
                         byte shopSourceSlot = (byte)(InventorySlotOffsetConstant + (_hoveredItem.GridPosition.Y * Columns) + _hoveredItem.GridPosition.X);
                         ownShop.QuickAdd(_hoveredItem, shopSourceSlot);
+                        Scene?.SetMouseInputConsumed();
+                        return;
+                    }
+
+                    // Personal server: right-click sells the item while an NPC shop is open.
+                    if (NpcShopControl.Instance is { Visible: true, IsRepairMode: false })
+                    {
+                        byte sellSlot = (byte)(InventorySlotOffsetConstant + (_hoveredItem.GridPosition.Y * Columns) + _hoveredItem.GridPosition.X);
+                        QuickSellToNpc(_hoveredItem, sellSlot);
+                        Scene?.SetMouseInputConsumed();
+                        return;
+                    }
+
+                    // Personal server: right-click moves the item to the vault while it is open.
+                    if (VaultControl.Instance is { Visible: true } && VaultControl.Instance.GetDraggedItem() == null)
+                    {
+                        byte vaultSourceSlot = (byte)(InventorySlotOffsetConstant + (_hoveredItem.GridPosition.Y * Columns) + _hoveredItem.GridPosition.X);
+                        QuickMoveToVault(_hoveredItem, vaultSourceSlot);
+                        Scene?.SetMouseInputConsumed();
+                        return;
+                    }
+
+                    // Personal server: right-click moves the item to the chaos machine while it is open.
+                    if (Client.Main.Controls.UI.Game.ChaosMixControl.Instance is { Visible: true } chaosMix && chaosMix.GetDraggedItem() == null)
+                    {
+                        byte chaosSourceSlot = (byte)(InventorySlotOffsetConstant + (_hoveredItem.GridPosition.Y * Columns) + _hoveredItem.GridPosition.X);
+                        QuickMoveToChaosMachine(_hoveredItem, chaosSourceSlot);
                         Scene?.SetMouseInputConsumed();
                         return;
                     }
@@ -2272,6 +2378,51 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 rejectText: "Cancel");
         }
 
+        /// <summary>
+        /// Right-click sale: ordinary items are sold at once, valuable ones (expensive, excellent, ancient, +7 and
+        /// higher) after a confirmation, which Enter accepts. One sale at a time, because the client remembers
+        /// only one pending sell slot until the server answers.
+        /// </summary>
+        private void QuickSellToNpc(InventoryItem item, byte slotIndex)
+        {
+            var definition = item?.Definition;
+            if (definition == null || _networkManager == null)
+            {
+                return;
+            }
+
+            string displayName = BuildItemDisplayName(item);
+            if (!definition.CanSellToNpc)
+            {
+                MessageWindow.Show($"Item '{displayName}' cannot be sold to NPC shop.");
+                return;
+            }
+
+            long now = Environment.TickCount64;
+            if (now < _nextQuickSellMs)
+            {
+                return;
+            }
+
+            _nextQuickSellMs = now + 400;
+
+            bool valuable = definition.IsExpensive || item.Details.IsExcellent || item.Details.IsAncient || item.Details.Level >= 7;
+            if (!valuable)
+            {
+                SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+                ExecuteSellToNpc(slotIndex);
+                return;
+            }
+
+            RequestDialog.Show(
+                $"Sell {displayName}?\n(Enter - sell, Esc - cancel)",
+                onAccept: () => ExecuteSellToNpc(slotIndex),
+                acceptText: "Sell",
+                rejectText: "Cancel");
+        }
+
+        private long _nextQuickSellMs;
+
         private void ExecuteSellToNpc(byte slotIndex)
         {
             if (_networkManager == null)
@@ -2420,7 +2571,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 }
 
                 // Level indicator
-                if (item.Details.Level > 0)
+                if (ItemGridRenderHelper.ShowsLevelBadge(item))
                 {
                     ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, pixel, font, itemRect, item.Details.Level,
                                        lvl => lvl >= 9 ? Theme.Danger :
@@ -2559,7 +2710,8 @@ namespace Client.Main.Controls.UI.Game.Inventory
             }
 
             Rectangle gridRect = Translate(_gridRect);
-            var dragged = _pickedItem_renderer_item() ?? VaultControl.Instance?.GetDraggedItem();
+            var dragged = _pickedItem_renderer_item() ?? VaultControl.Instance?.GetDraggedItem()
+                          ?? Client.Main.Controls.UI.Game.ChaosMixControl.Instance?.GetDraggedItem();
 
             if (dragged != null)
             {

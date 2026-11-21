@@ -1191,8 +1191,19 @@ namespace Client.Main.Controls.UI.Game.Character
             var service = _networkManager.GetCharacterService();
             if (service != null)
             {
-                _ = service.SendIncreaseCharacterStatPointRequestAsync(attributeToSend);
-                _logger.LogInformation("Sent request to add point to {Attribute}.", attributeToSend);
+                // Personal server: Shift+click adds 100 points, Ctrl+click 10. The protocol adds one point per
+                // request, so the requests are sent one after another; the server refuses the ones over the limit.
+                var keyboard = MuGame.Instance.Keyboard;
+                int count = keyboard.IsKeyDown(Keys.LeftShift) || keyboard.IsKeyDown(Keys.RightShift) ? 100
+                    : keyboard.IsKeyDown(Keys.LeftControl) || keyboard.IsKeyDown(Keys.RightControl) ? 10
+                    : 1;
+                count = Math.Min(count, (int)_characterState.LevelUpPoints);
+                _ = Task.Run(async () =>
+                {
+                    for (int i = 0; i < count; i++)
+                        await service.SendIncreaseCharacterStatPointRequestAsync(attributeToSend);
+                });
+                _logger.LogInformation("Sent {Count} request(s) to add a point to {Attribute}.", count, attributeToSend);
             }
             else
             {

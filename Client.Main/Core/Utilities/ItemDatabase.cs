@@ -114,7 +114,7 @@ namespace Client.Main.Core.Utilities
                         Group = item.ItemSubGroup,
                         AllowedClasses = BuildAllowedClasses(item),
                         IsExpensive = item.Expensive != 0,
-                        CanSellToNpc = item.SellNpc != 0,
+                        CanSellToNpc = item.SellNpc != 0 || IsServerSellablePet(item.ItemSubGroup, item.ItemSubIndex),
                         Money = item.Money,
                         ItemValue = item.ItemValue,
                         SkillIndex = item.SkillIndex,
@@ -320,6 +320,10 @@ namespace Client.Main.Core.Utilities
 
         public static string GetItemName(ReadOnlySpan<byte> itemData) =>
             GetItemDefinition(itemData)?.Name;
+
+        /// <summary>Pets the personal server lets sell to NPC (tmp/economy/15-pets-sellable.sql), although S20 data marks them unsellable.</summary>
+        private static bool IsServerSellablePet(int group, int index) =>
+            group == 13 && index is 64 or 65 or 80 or 106 or 123;
 
         public struct ItemDetails
         {

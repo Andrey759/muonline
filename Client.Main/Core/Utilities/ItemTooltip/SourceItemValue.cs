@@ -288,6 +288,12 @@ namespace Client.Main.Core.Utilities.ItemTooltip
     {
         Gold = 1000;
     }
+    else if (ip.Type == ITEM_ALE)
+    {
+        // Personal server: cheap Ale in the potion stores, OpenMU price definition "Ale" = 100
+        // (projects/personal/mu-online/tmp/economy/13-shops-alcohol.sql).
+        Gold = 100;
+    }
     else if (ip.Type == ITEM_POTION + 20)
     {
         Gold = 900;
@@ -390,11 +396,13 @@ namespace Client.Main.Core.Utilities.ItemTooltip
 
         if (ip.Type >= ITEM_POTION && ip.Type <= ITEM_ANTIDOTE)
         {
-            if (Level > 0)
-                Gold *= (long)Math.Pow(2, Level);
-
-            Gold = Gold / 10 * 10;
+            // Personal server: cheap potions sold in stacks of 255. Must match the OpenMU price definitions
+            // "Personal potions" / "Personal large potions" (projects/personal/mu-online/tmp/economy/06-shops.sql).
+            Gold = ip.Type == ITEM_LARGE_HEALING_POTION || ip.Type == ITEM_LARGE_MANA_POTION
+                ? 40 + 16 * Level / 3
+                : p.Value * (long)Math.Pow(2, Level);
             Gold *= (long)ip.Durability;
+            Gold = Gold >= 1000 ? Gold / 100 * 100 : Gold >= 100 ? Gold / 10 * 10 : Gold; // server RoundPrice
 
             if (goldType != 0)
             {
@@ -647,6 +655,9 @@ namespace Client.Main.Core.Utilities.ItemTooltip
     case ITEM_PANDA_TRANSFORMATION_RING:
     case ITEM_DEMON:
     case ITEM_SPIRIT_OF_GUARDIAN:
+    case ITEM_HELPER + 0: // Guardian Angel, personal server: symbolic price
+    case ITEM_HELPER + 1: // Imp
+    case ITEM_HELPER + 2: // Horn of Uniria
     case ITEM_HELPER + 109:
     case ITEM_HELPER + 110:
     case ITEM_HELPER + 111:
@@ -709,6 +720,9 @@ namespace Client.Main.Core.Utilities.ItemTooltip
         goto EXIT_CALCULATE;
     case ITEM_DEMON:
     case ITEM_SPIRIT_OF_GUARDIAN:
+    case ITEM_HELPER + 0:
+    case ITEM_HELPER + 1:
+    case ITEM_HELPER + 2:
         goto EXIT_CALCULATE;
     case ITEM_HELPER + 109:
         goto EXIT_CALCULATE;

@@ -2101,6 +2101,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                     _monsterNameOverrides.TryRemove(masked, out _);
 
+                    BumpDropVersion(masked);
                     _scopeManager.RemoveObjectFromScope(masked);
                     objectsToRemove.Add(masked);
                 }
@@ -2768,7 +2769,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             string soundPath,
             bool isFreshDrop = true)
         {
-            _droppedItemQueue.Enqueue(new DroppedItemWorkItem(dropObj, maskedId, soundPath, isFreshDrop));
+            _droppedItemQueue.Enqueue(new DroppedItemWorkItem(dropObj, maskedId, soundPath, isFreshDrop, BumpDropVersion(maskedId)));
             TryStartDroppedItemWorker();
         }
 
@@ -2792,7 +2793,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                             workItem.DropObject,
                             workItem.MaskedId,
                             workItem.SoundPath,
-                            workItem.IsFreshDrop);
+                            workItem.IsFreshDrop,
+                            workItem.Version);
                     }
                     catch (Exception ex)
                     {
@@ -2812,7 +2814,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             ScopeObject dropObj,
             ushort maskedId,
             string soundPath,
-            bool isFreshDrop)
+            bool isFreshDrop,
+            int version)
         {
             // Create the pooled object on the main thread, then keep it unpublished until
             // CPU decoding, GPU upload and terrain placement have all completed.
@@ -2821,7 +2824,7 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
             MuGame.ScheduleOnMainThread(() =>
             {
-                ProcessDroppedItemOnMainThread(dropObj, maskedId, soundPath, isFreshDrop, tcs);
+                ProcessDroppedItemOnMainThread(dropObj, maskedId, soundPath, isFreshDrop, version, tcs);
             });
 
             await tcs.Task;
@@ -2832,10 +2835,18 @@ namespace Client.Main.Networking.PacketHandling.Handlers
             ushort maskedId,
             string soundPath,
             bool isFreshDrop,
+            int version,
             TaskCompletionSource<bool> tcs)
         {
             try
             {
+                // Removed (or replaced by a newer drop with the same id) while waiting in the queue.
+                if (!IsDropVersionCurrent(maskedId, version))
+                {
+                    tcs.TrySetResult(false);
+                    return;
+                }
+
                 if (!TryGetActiveWalkableWorld(out var world))
                 {
                     tcs.TrySetResult(false);
@@ -2886,7 +2897,8 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                                 if (MuGame.Instance.ActiveScene?.World != world ||
                                     world.Status != GameControlStatus.Ready ||
                                     !ReferenceEquals(obj.World, world) ||
-                                    obj.LoadGeneration != loadGeneration)
+                                    obj.LoadGeneration != loadGeneration ||
+                                    !IsDropVersionCurrent(maskedId, version))
                                 {
                                     obj.Recycle();
                                     publishCompletion.TrySetResult(false);

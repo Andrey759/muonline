@@ -155,6 +155,25 @@ namespace Client.Main.Configuration
         public EnvironmentSettings Environment { get; set; } = new();
         public UiSettings Ui { get; set; } = new();
         public QuickLoginSettings QuickLogin { get; set; } = new();
+        public AutoHelperSettings AutoHelper { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Auto farm (Home) and auto pickup (End) of the personal server, see GameSceneAutoHelper.
+    /// </summary>
+    public class AutoHelperSettings
+    {
+        /// <summary>Drink the potion of the Q slot below this share of health, in percent.</summary>
+        public int HealthPotionPercent { get; set; } = 66;
+
+        /// <summary>Drink the potion of the W slot below this share of mana, in percent.</summary>
+        public int ManaPotionPercent { get; set; } = 50;
+
+        /// <summary>Walk back to the farming tile after being pushed away for this long.</summary>
+        public double ReturnDelaySeconds { get; set; } = 5;
+
+        /// <summary>Pick up items within this many tiles (of the farming tile while farming).</summary>
+        public float PickupRadius { get; set; } = 6;
     }
 
     /// <summary>

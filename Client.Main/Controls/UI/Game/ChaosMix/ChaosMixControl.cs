@@ -280,6 +280,41 @@ namespace Client.Main.Controls.UI.Game
             DrawDynamicContent(sb);
         }
 
+        public override void DrawAfter(GameTime gameTime)
+        {
+            base.DrawAfter(gameTime);
+            if (!Visible || _hoveredItem == null || _draggedItem != null) return;
+
+            var spriteBatch = GraphicsManager.Instance?.Sprite;
+            if (spriteBatch == null) return;
+
+            SpriteBatchScope? scope = null;
+            if (!SpriteBatchScope.BatchIsBegun)
+            {
+                scope = new SpriteBatchScope(spriteBatch, SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, transform: UiScaler.SpriteTransform);
+            }
+
+            try
+            {
+                var item = _hoveredItem;
+                var lines = ItemUiHelper.BuildTooltipLines(item);
+                var hovered = new Rectangle(
+                    DisplayRectangle.X + _gridRect.X + item.GridPosition.X * SLOT_WIDTH,
+                    DisplayRectangle.Y + _gridRect.Y + item.GridPosition.Y * SLOT_HEIGHT,
+                    item.Definition.Width * SLOT_WIDTH,
+                    item.Definition.Height * SLOT_HEIGHT);
+                Color rarity = item.Details.IsExcellent ? new Color(110, 230, 110) :
+                               item.Details.IsAncient ? new Color(90, 190, 255) :
+                               item.Details.Level >= 7 ? Client.Main.Controls.UI.Ornate.OrnateStyle.Gold :
+                               Client.Main.Controls.UI.Ornate.OrnateStyle.TextLight;
+                Client.Main.Controls.UI.Ornate.OrnateItemUi.Tooltip(spriteBatch, lines, rarity, hovered, MuGame.Instance.UiMouseState.Position);
+            }
+            finally
+            {
+                scope?.Dispose();
+            }
+        }
+
         public void DrawPickedPreview(SpriteBatch spriteBatch, GameTime gameTime)
         {
             if (!Visible || _draggedItem == null || spriteBatch == null)
@@ -773,6 +808,16 @@ namespace Client.Main.Controls.UI.Game
 
         private void HandleMouseInput(Point mousePos, bool leftJustPressed)
         {
+            bool rightJustPressed = MuGame.Instance.UiMouseState.RightButton == ButtonState.Pressed &&
+                                    MuGame.Instance.PrevUiMouseState.RightButton == ButtonState.Released;
+            if (rightJustPressed && _draggedItem == null && _hoveredItem != null && !_mixInProgress &&
+                InventoryControl.Instance?.GetDraggedItem() == null)
+            {
+                QuickMoveToInventory(_hoveredItem);
+                Scene?.SetMouseInputConsumed();
+                return;
+            }
+
             if (!leftJustPressed)
             {
                 return;
@@ -1247,6 +1292,46 @@ namespace Client.Main.Controls.UI.Game
             if (slot.X < 0) return null;
             return _itemGrid[slot.X, slot.Y];
         }
+
+        /// <summary>First free place for the item in the mix box, as a server slot (quick move by right-click).</summary>
+        public bool TryFindFreeSlot(InventoryItem item, out byte serverSlot)
+        {
+            serverSlot = 0;
+            if (item?.Definition == null) return false;
+            for (int y = 0; y < Rows; y++)
+            {
+                for (int x = 0; x < Columns; x++)
+                {
+                    if (CanPlaceItem(item, new Point(x, y)))
+                    {
+                        serverSlot = (byte)(y * Columns + x);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>Right-click on a mix box item moves it to the first free inventory place.</summary>
+        private void QuickMoveToInventory(InventoryItem item)
+        {
+            var inventory = InventoryControl.Instance;
+            if (item?.Definition == null || inventory == null || _networkManager == null) return;
+            if (!inventory.TryFindFreeGridSlot(item, out Point invSlot))
+            {
+                MessageWindow.Show("Inventory is full.");
+                return;
+            }
+
+            BeginDrag(item);
+            MoveItemToInventory(invSlot, inventory);
+            _draggedItem = null;
+            _draggedOriginalSlot = new Point(-1, -1);
+            _pendingDropSlot = new Point(-1, -1);
+            SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+        }
+
+        public InventoryItem GetDraggedItem() => _draggedItem;
 
         public Point GetSlotAtScreenPosition(Point screenPos)
             => ItemGridRenderHelper.GetSlotAtScreenPosition(DisplayRectangle, _gridRect, Columns, Rows, SLOT_WIDTH, SLOT_HEIGHT, screenPos);

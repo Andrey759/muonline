@@ -1310,6 +1310,13 @@ namespace Client.Main.Controls.UI.Game.Inventory
                         for (int i = 0; i < pose.MeshOrder.Length; i++)
                         {
                             int meshIndex = pose.MeshOrder[i];
+                            // Additive effect meshes (rings, flares on black) keep their own look: the material glow
+                            // covers the whole polygon and turns them into squares (Staff of Resurrection +9).
+                            if (meshIndex > 0 && string.Equals(bmd.Meshes[meshIndex].BlendingMode, "Additive", StringComparison.OrdinalIgnoreCase))
+                            {
+                                RenderPlainPreviewMesh(gd, bmd, meshIndex, pose.Meshes[meshIndex], world, view, projection);
+                                continue;
+                            }
                             RenderMeshWithItemMaterialPreview(
                                 gd,
                                 bmd,
@@ -1567,6 +1574,38 @@ namespace Client.Main.Controls.UI.Game.Inventory
                                       props.Level >= 11 &&
                                       GraphicsManager.Instance.HasItemUpgradeTextures;
             return !usesHighLevelArmor;
+        }
+
+        private static void RenderPlainPreviewMesh(GraphicsDevice gd, BMD bmd, int meshIndex, PreviewMeshGeometry geometry,
+                                                   Matrix world, Matrix view, Matrix projection)
+        {
+            var effect = GraphicsManager.Instance.BasicEffect3D;
+            Matrix oldV = effect.View, oldP = effect.Projection, oldW = effect.World;
+            float oldAlpha = effect.Alpha;
+            Vector3 oldDiffuse = effect.DiffuseColor;
+            bool oldTex = effect.TextureEnabled, oldVc = effect.VertexColorEnabled, oldLight = effect.LightingEnabled, oldFog = effect.FogEnabled;
+            Texture2D oldTexture = effect.Texture;
+            try
+            {
+                effect.Alpha = 1f;
+                effect.DiffuseColor = Vector3.One;
+                effect.TextureEnabled = true;
+                effect.VertexColorEnabled = true;
+                effect.LightingEnabled = false;
+                effect.FogEnabled = false;
+                effect.View = view;
+                effect.Projection = projection;
+                effect.World = world;
+                RenderMeshWithBlendState(gd, effect, bmd, meshIndex, geometry);
+            }
+            finally
+            {
+                effect.View = oldV; effect.Projection = oldP; effect.World = oldW;
+                effect.Alpha = oldAlpha; effect.DiffuseColor = oldDiffuse;
+                effect.TextureEnabled = oldTex; effect.VertexColorEnabled = oldVc;
+                effect.LightingEnabled = oldLight; effect.FogEnabled = oldFog;
+                effect.Texture = oldTexture;
+            }
         }
 
         private static void RenderMeshWithItemMaterialPreview(GraphicsDevice gd,

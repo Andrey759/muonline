@@ -51,7 +51,7 @@ namespace Client.Main.Controls.UI.Game.Hud
         {
             // Calculate experience requirement for previous level
             ushort currentLevel = _characterState.Level;
-            ulong prevLevelExp = currentLevel > 1 ? (ulong)((currentLevel - 1 + 9) * (currentLevel - 1) * (currentLevel - 1) * 10) : 0;
+            ulong prevLevelExp = currentLevel > 1 ? Client.Main.Core.Utilities.ExperienceTable.TotalForLevel(currentLevel) : 0;
 
             // Calculate experience range for current level
             ulong expInCurrentLevel = _characterState.Experience - prevLevelExp;

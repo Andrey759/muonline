@@ -49,6 +49,13 @@ namespace Client.Main.Scenes
                 }
             }
 
+            if (LahapJewelMixControl.Instance.Visible)
+            {
+                _logger?.LogInformation("Hero moved, closing Lahap jewel bundle window.");
+                LahapJewelMixControl.Instance.CloseWindow(); // also sends CloseNpcRequest
+                npcClosed = true;
+            }
+
             // Any other NPC conversation the server still considers open (dialogs without a window,
             // guild master dialog, ...) ends when the hero walks away, as in the original client.
             if (!npcClosed && MuGame.Network?.GetCharacterService()?.IsNpcDialogOpen == true)
