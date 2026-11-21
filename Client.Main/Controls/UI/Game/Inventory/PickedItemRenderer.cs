@@ -25,6 +25,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         public void PickUpItem(InventoryItem item)
         {
+            if (item != null) Client.Main.Controllers.ItemSounds.PlayMove();
             Item = item;
             Visible = true;
             // For now, we draw a rectangle
@@ -36,6 +37,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
         public void ReleaseItem()
         {
+            if (Item != null) Client.Main.Controllers.ItemSounds.PlayMove();
             Item = null;
             Visible = false;
         }

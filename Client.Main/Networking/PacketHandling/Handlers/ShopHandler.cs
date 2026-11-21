@@ -440,8 +440,6 @@ namespace Client.Main.Networking.PacketHandling.Handlers
 
                 MuGame.ScheduleOnMainThread(() =>
                 {
-                    ChaosMixControl.Instance?.NotifyCraftingResult(res.Result);
-
                     var scene = MuGame.Instance?.ActiveScene as GameScene;
                     string msg = res.Result switch
                     {
@@ -457,7 +455,12 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                         _ => $"Mix result: {res.Result}"
                     };
 
-                    scene?.ChatLog?.AddMessage("System", msg, Client.Main.Models.MessageType.System);
+                    // The chat line appears with the result, after the chaos machine's mixing pause.
+                    void Post() => scene?.ChatLog?.AddMessage("System", msg, Client.Main.Models.MessageType.System);
+                    if (ChaosMixControl.Instance is { } chaosMix)
+                        chaosMix.NotifyCraftingResult(res.Result, Post);
+                    else
+                        Post();
                 });
             }
             catch (Exception ex)

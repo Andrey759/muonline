@@ -956,6 +956,7 @@ namespace Client.Main.Controls.UI.Game
             if (svc != null)
             {
                 _ = svc.SendBuyItemFromNpcRequestAsync(slot);
+                Client.Main.Controllers.ItemSounds.PlayBuy();
             }
         }
 

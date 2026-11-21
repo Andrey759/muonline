@@ -873,7 +873,9 @@ namespace Client.Main.Controls.UI.Game
             }
 
             _mixInProgress = true;
-            SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+            _mixStartedAtMs = Environment.TickCount64;
+            _mixRefreshPending = false;
+            SoundController.Instance.PlayBuffer(MixWorkingSound);
 
             _ = Task.Run(async () =>
             {
@@ -888,9 +890,48 @@ namespace Client.Main.Controls.UI.Game
             });
         }
 
-        public void NotifyCraftingResult(ItemCraftingResult.CraftingResult result)
+        // The machine "works" for a moment like in the original: the working sound plays, and the result (message,
+        // sound, new mix box content) is shown when it ends, although the server answers at once.
+        private const int MixDurationMs = 2200;
+        private const string MixWorkingSound = "Sound/nMix.wav";
+        private const string MixSuccessSound = "Sound/eMix.wav";
+        private const string MixFailSound = "Sound/iButtonError.wav";
+        private long _mixStartedAtMs;
+        private bool _mixRefreshPending;
+
+        /// <summary>Shows the crafting result; <paramref name="onShown"/> runs when it is shown (after the mixing pause).</summary>
+        public void NotifyCraftingResult(ItemCraftingResult.CraftingResult result, Action onShown = null)
         {
+            long remaining = _mixInProgress ? MixDurationMs - (Environment.TickCount64 - _mixStartedAtMs) : 0;
+            if (remaining > 0)
+            {
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay((int)remaining);
+                    MuGame.ScheduleOnMainThread(() => ShowCraftingResult(result, onShown));
+                });
+                return;
+            }
+
+            ShowCraftingResult(result, onShown);
+        }
+
+        private void ShowCraftingResult(ItemCraftingResult.CraftingResult result, Action onShown)
+        {
+            bool wasMixing = _mixInProgress;
             _mixInProgress = false;
+            if (wasMixing && result is ItemCraftingResult.CraftingResult.Success or ItemCraftingResult.CraftingResult.Failed)
+            {
+                SoundController.Instance.PlayBuffer(result == ItemCraftingResult.CraftingResult.Success ? MixSuccessSound : MixFailSound);
+            }
+
+            if (_mixRefreshPending)
+            {
+                _mixRefreshPending = false;
+                RefreshChaosMachineContent();
+            }
+
+            onShown?.Invoke();
             string message = result switch
             {
                 ItemCraftingResult.CraftingResult.Success => "Mix succeeded.",
@@ -922,7 +963,12 @@ namespace Client.Main.Controls.UI.Game
             _characterState = _networkManager?.GetCharacterState() ?? MuGame.Network?.GetCharacterState();
             if (_characterState != null)
             {
-                _characterState.ChaosMachineItemsChanged += () => MuGame.ScheduleOnMainThread(RefreshChaosMachineContent);
+                _characterState.ChaosMachineItemsChanged += () => MuGame.ScheduleOnMainThread(() =>
+                {
+                    // The result item arrives with the result; it is shown when the mixing pause ends.
+                    if (_mixInProgress) { _mixRefreshPending = true; return; }
+                    RefreshChaosMachineContent();
+                });
             }
         }
 
@@ -1328,7 +1374,6 @@ namespace Client.Main.Controls.UI.Game
             _draggedItem = null;
             _draggedOriginalSlot = new Point(-1, -1);
             _pendingDropSlot = new Point(-1, -1);
-            SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
         }
 
         public InventoryItem GetDraggedItem() => _draggedItem;
@@ -1377,6 +1422,7 @@ namespace Client.Main.Controls.UI.Game
 
         private void BeginDrag(InventoryItem item)
         {
+            Client.Main.Controllers.ItemSounds.PlayMove();
             _draggedItem = item;
             _draggedOriginalSlot = item.GridPosition;
             RemoveItemFromGrid(item);
@@ -1391,6 +1437,7 @@ namespace Client.Main.Controls.UI.Game
         private void AttemptDrop(Point mousePos)
         {
             if (_draggedItem == null) return;
+            Client.Main.Controllers.ItemSounds.PlayMove();
 
             var dropSlot = GetSlotAtScreenPosition(mousePos);
             var inventory = InventoryControl.Instance;

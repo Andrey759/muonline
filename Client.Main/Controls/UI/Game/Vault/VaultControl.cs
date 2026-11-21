@@ -646,7 +646,6 @@ namespace Client.Main.Controls.UI.Game
             _draggedItem = null;
             _draggedOriginalSlot = new Point(-1, -1);
             _pendingDropSlot = new Point(-1, -1);
-            SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -1541,6 +1540,7 @@ namespace Client.Main.Controls.UI.Game
 
         private void BeginDrag(InventoryItem item)
         {
+            Client.Main.Controllers.ItemSounds.PlayMove();
             _draggedItem = item;
             _draggedOriginalSlot = item.GridPosition;
             RemoveItemFromGrid(item);
@@ -1556,6 +1556,7 @@ namespace Client.Main.Controls.UI.Game
         private void AttemptDrop(Point mousePos)
         {
             if (_draggedItem == null) return;
+            Client.Main.Controllers.ItemSounds.PlayMove();
 
             var dropSlot = GetSlotAtScreenPosition(mousePos);
             var inventory = InventoryControl.Instance;

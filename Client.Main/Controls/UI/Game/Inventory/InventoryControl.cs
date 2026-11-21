@@ -612,7 +612,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
             RemoveItemFromGrid(item);
             _items.Remove(item);
             if (ReferenceEquals(_hoveredItem, item)) _hoveredItem = null;
-            SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
+            Client.Main.Controllers.ItemSounds.PlayMove();
 
             _ = Task.Run(async () =>
             {
@@ -2409,7 +2409,6 @@ namespace Client.Main.Controls.UI.Game.Inventory
             bool valuable = definition.IsExpensive || item.Details.IsExcellent || item.Details.IsAncient || item.Details.Level >= 7;
             if (!valuable)
             {
-                SoundController.Instance.PlayBuffer("Sound/iButtonClick.wav");
                 ExecuteSellToNpc(slotIndex);
                 return;
             }
@@ -2438,6 +2437,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 return;
             }
 
+            Client.Main.Controllers.ItemSounds.PlaySell();
             var state = _networkManager.GetCharacterState();
             state.StashPendingSellSlot(slotIndex);
 
