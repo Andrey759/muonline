@@ -3300,7 +3300,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
         public int GetFreeEquipSlotAtScreenPosition(Point screenPos)
         {
             if (!Visible) return -1;
-            int slot = GetEquipSlotAtScreenPosition(screenPos);
+            int slot = GetEquipSlotAtScreenPosition(ToLayout(screenPos));
             return slot >= 0 && !_equippedItems.ContainsKey((byte)slot) ? slot : -1;
         }
 

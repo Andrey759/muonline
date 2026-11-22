@@ -39,7 +39,6 @@ namespace Client.Main.Objects
 
             Ray mouseRay = MuGame.Instance.MouseRay;
             WorldObject bestObject = null;
-            float bestDistance = float.MaxValue;
 
             // SourceMain5.2 gives dropped items priority while Alt is held. This allows
             // the item under the cursor to be selected even when a character or NPC
@@ -52,12 +51,22 @@ namespace Client.Main.Objects
                 return;
             }
 
+            WorldObject bestWalker = null;
+            WorldObject bestOther = null;
+            float bestWalkerDistance = float.MaxValue;
+            float bestOtherDistance = float.MaxValue;
+
             // Keep the current target responsive even when the round-robin cursor is
             // currently scanning another section of a large crowd.
             if (_previousHovered != null &&
                 _previousHovered.Visible &&
                 ReferenceEquals(_previousHovered.World, scene.World))
-                TrySelectCandidate(_previousHovered, mouseRay, scene, ref bestObject, ref bestDistance);
+            {
+                if (_previousHovered is WalkerObject)
+                    TrySelectCandidate(_previousHovered, mouseRay, scene, ref bestWalker, ref bestWalkerDistance);
+                else
+                    TrySelectCandidate(_previousHovered, mouseRay, scene, ref bestOther, ref bestOtherDistance);
+            }
 
             ScanCategory(
                 objects,
@@ -66,8 +75,8 @@ namespace Client.Main.Objects
                 mouseRay,
                 scene,
                 ref _walkerScanOffset,
-                ref bestObject,
-                ref bestDistance);
+                ref bestWalker,
+                ref bestWalkerDistance);
 
             ScanCategory(
                 objects,
@@ -76,8 +85,12 @@ namespace Client.Main.Objects
                 mouseRay,
                 scene,
                 ref _otherScanOffset,
-                ref bestObject,
-                ref bestDistance);
+                ref bestOther,
+                ref bestOtherDistance);
+
+            // Characters, NPCs and monsters win over map objects on the same ray: an NPC standing at a lamp
+            // (Gens Vanert) is talked to instead of leaning on the lamp.
+            bestObject = bestWalker ?? bestOther;
 
             if (bestObject == null)
             {

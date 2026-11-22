@@ -54,6 +54,17 @@ namespace Client.Main.Objects
         public WeaponObject Weapon2 { get; private set; }
         public WingObject Wings { get; private set; }
 
+        /// <summary>Whether hovering the NPC draws the outline. Guards have nothing to talk about.</summary>
+        protected virtual bool ShowsHoverOutline => true;
+
+        /// <summary>
+        /// Whether the hovered NPC outlines this child: an NPC built from body parts like a player has no
+        /// visible meshes of its own, so its helm, armour, pants, gloves and boots carry the outline.
+        /// </summary>
+        internal bool OutlinesBodyPart(ModelObject part) =>
+            IsMouseHover && ShowsHoverOutline && part != null &&
+            (part == Helm || part == HelmMask || part == Armor || part == Pants || part == Gloves || part == Boots);
+
         public NPCObject()
         {
             _logger = AppLoggerFactory?.CreateLogger(GetType());

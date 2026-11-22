@@ -53,6 +53,8 @@ namespace Client.Main.Objects.NPCS
             }
         }
 
+        protected override bool ShowsHoverOutline => false;
+
         protected override void HandleClick() { }
     }
 }

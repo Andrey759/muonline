@@ -740,7 +740,7 @@ namespace Client.Main.Objects
                 if (RenderShadow && !LowQuality && !useShadowMap && !isNight && !blobAlreadyDrawn)
                     doShadow = TryGetShadowMatrix(out shadowMatrix);
 
-                bool highlightAllowed = !LowQuality && IsMouseHover &&
+                bool highlightAllowed = !LowQuality && IsHoverOutlined &&
                                         !(this is MonsterObject monster && monster.IsDead);
                 Matrix highlightMatrix = Matrix.Identity;
                 Vector3 highlightColor = Vector3.One;
@@ -896,7 +896,7 @@ namespace Client.Main.Objects
                 shadowOpacity *= MathHelper.Clamp(1f - lum * 0.6f, 0.35f, 1f);
             }
 
-            bool highlightAllowed = !isAfterDraw && !LowQuality && IsMouseHover &&
+            bool highlightAllowed = !isAfterDraw && !LowQuality && IsHoverOutlined &&
                                    !(this is MonsterObject m && m.IsDead);
             Matrix highlightMatrix = Matrix.Identity;
             Vector3 highlightColor = Vector3.One;
@@ -1546,6 +1546,9 @@ namespace Client.Main.Objects
             // duplicating animation, uploads and draw calls for every walker.
             return true;
         }
+
+        /// <summary>Hovered, or a body part of a hovered NPC built like a player.</summary>
+        private bool IsHoverOutlined => IsMouseHover || (Parent is NPCObject npc && npc.OutlinesBodyPart(this));
 
         /// <summary>
         /// Moves the enlarged highlight copy a little away from the camera. Enlarging pushes parts which stand out

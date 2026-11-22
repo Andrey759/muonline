@@ -185,9 +185,10 @@ namespace Client.Main.Core.Utilities
                 };
             }
 
-            // 2) Similar recipe (best effort)
+            // 2) Similar recipe (best effort). An empty box has no similar recipe: otherwise the one with the
+            //    fewest ingredients would be shown as a hint.
             ResetTestCounts(mixItems);
-            var similar = FindMostSimilarRecipe(recipes, mixItems);
+            var similar = mixItems.Count > 0 ? FindMostSimilarRecipe(recipes, mixItems) : null;
             return new ChaosMixEvaluation
             {
                 CurrentRecipe = null,
