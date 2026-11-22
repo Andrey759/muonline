@@ -265,8 +265,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
 
             if (ItemGridRenderHelper.ShowsLevelBadge(item))
                 ItemGridRenderHelper.DrawItemLevelBadge(sb, pixel, GraphicsManager.Instance.Font, rect, item.Details.Level,
-                    level => level >= 9 ? ModernHudTheme.Danger : level >= 7 ? ModernHudTheme.Accent :
-                             level >= 4 ? ModernHudTheme.AccentDim : ModernHudTheme.TextGray,
+                    _ => ItemGridRenderHelper.LevelBadgeColor(item),
                     new Color(0, 0, 0, 180) * alpha);
         }
 

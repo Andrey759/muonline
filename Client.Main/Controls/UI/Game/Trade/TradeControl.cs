@@ -1029,10 +1029,7 @@ namespace Client.Main.Controls.UI.Game.Trade
                 if (font != null && ItemGridRenderHelper.ShowsLevelBadge(item))
                 {
                     ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, pixel, font, rect, item.Details.Level,
-                                       lvl => lvl >= 9 ? Theme.Danger :
-                                              lvl >= 7 ? Theme.Accent :
-                                              lvl >= 4 ? Theme.AccentDim :
-                                              Theme.TextGray,
+                                       _ => ItemGridRenderHelper.LevelBadgeColor(item),
                                        new Color(0, 0, 0, 180));
                 }
             }
@@ -1090,10 +1087,7 @@ namespace Client.Main.Controls.UI.Game.Trade
                 if (font != null && ItemGridRenderHelper.ShowsLevelBadge(item))
                 {
                     ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, pixel, font, rect, item.Details.Level,
-                                       lvl => lvl >= 9 ? Theme.Danger :
-                                              lvl >= 7 ? Theme.Accent :
-                                              lvl >= 4 ? Theme.AccentDim :
-                                              Theme.TextGray,
+                                       _ => ItemGridRenderHelper.LevelBadgeColor(item),
                                        new Color(0, 0, 0, 180));
                 }
             }
@@ -1639,7 +1633,7 @@ namespace Client.Main.Controls.UI.Game.Trade
                 var item = new InventoryItem(def, new Point(gridX, gridY), data);
                 if (data.Length > 2)
                 {
-                    item.Durability = data[2];
+                    item.Durability = ItemDatabase.GetItemDurability(data);
                 }
 
                 _partnerItems.Add(item);
@@ -1664,7 +1658,7 @@ namespace Client.Main.Controls.UI.Game.Trade
                 var item = new InventoryItem(def, new Point(gridX, gridY), data);
                 if (data.Length > 2)
                 {
-                    item.Durability = data[2];
+                    item.Durability = ItemDatabase.GetItemDurability(data);
                 }
 
                 _myItems.Add(item);

@@ -386,6 +386,36 @@ namespace Client.Main.Controllers
             _managedLoopingInstances.Clear();
         }
 
+        /// <summary>
+        /// Plays a loaded sound on its own instance, which the caller keeps and may stop. Returns null (and starts
+        /// loading) when the sound is not in the cache yet.
+        /// </summary>
+        public SoundEffectInstance PlayOwnedInstance(string relativePath)
+        {
+            if (_disposed || !Constants.SOUND_EFFECTS || Constants.SOUND_EFFECTS_VOLUME <= 0 || string.IsNullOrEmpty(relativePath)) return null;
+
+            string fullPath = Path.Combine(Constants.DataPath, relativePath);
+            SoundEffect cached = GetCachedSoundEffect(fullPath.ToLowerInvariant());
+            if (cached == null || cached.IsDisposed)
+            {
+                _ = LoadSoundEffectDataAsync(fullPath);
+                return null;
+            }
+
+            try
+            {
+                var instance = cached.CreateInstance();
+                instance.Volume = MathHelper.Clamp(Constants.SOUND_EFFECTS_VOLUME / 100f, 0f, 1f);
+                instance.Play();
+                return instance;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Unable to play sound {Path}", fullPath);
+                return null;
+            }
+        }
+
         public void PlayBuffer(string relativePath)
         {
             if (!Constants.SOUND_EFFECTS || string.IsNullOrEmpty(relativePath)) return;

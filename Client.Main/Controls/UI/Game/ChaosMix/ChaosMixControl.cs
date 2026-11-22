@@ -890,14 +890,24 @@ namespace Client.Main.Controls.UI.Game
                 {
                     if (!_mixInProgress || _mixStartedAtMs != mixToken) return;
                     _mixInProgress = false;
+                    StopWorkingSound();
                     _mixRefreshPending = false;
                     RefreshChaosMachineContent();
                     _warningLine = "No answer from the server.";
                 });
             });
             _mixRefreshPending = false;
-            _logger?.LogInformation("Chaos mix started: recipe {MixId}, working sound {Sound}.", mixId, MixWorkingSound);
-            SoundController.Instance.PlayBuffer(MixWorkingSound);
+            StopWorkingSound();
+            _workingSound = SoundController.Instance.PlayOwnedInstance(MixWorkingSound);
+            _logger?.LogInformation("Chaos mix started: recipe {MixId}, working sound {Sound}: {State}.", mixId, MixWorkingSound,
+                _workingSound?.State.ToString() ?? "not loaded");
+            var startedSound = _workingSound;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1000);
+                _logger?.LogInformation("Chaos mix working sound after 1 s: {State}.",
+                    startedSound == null ? "none" : startedSound.IsDisposed ? "disposed" : startedSound.State.ToString());
+            });
 
             _ = Task.Run(async () =>
             {
@@ -921,6 +931,23 @@ namespace Client.Main.Controls.UI.Game
         private const string MixFailSound = "Sound/eBreak.wav";
         private long _mixStartedAtMs;
         private bool _mixRefreshPending;
+        private Microsoft.Xna.Framework.Audio.SoundEffectInstance _workingSound;
+
+        private void StopWorkingSound()
+        {
+            var sound = _workingSound;
+            _workingSound = null;
+            if (sound == null || sound.IsDisposed) return;
+            try
+            {
+                sound.Stop();
+                sound.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "Unable to stop the chaos mix working sound.");
+            }
+        }
 
         /// <summary>Shows the crafting result; <paramref name="onShown"/> runs when it is shown (after the mixing pause).</summary>
         public void NotifyCraftingResult(ItemCraftingResult.CraftingResult result, Action onShown = null)
@@ -943,6 +970,7 @@ namespace Client.Main.Controls.UI.Game
         {
             bool wasMixing = _mixInProgress;
             _mixInProgress = false;
+            StopWorkingSound();
             if (wasMixing && result is ItemCraftingResult.CraftingResult.Success or ItemCraftingResult.CraftingResult.Failed)
             {
                 SoundController.Instance.PlayBuffer(result == ItemCraftingResult.CraftingResult.Success ? MixSuccessSound : MixFailSound);
@@ -1024,7 +1052,7 @@ namespace Client.Main.Controls.UI.Game
                 var item = new InventoryItem(def, new Point(gridX, gridY), data);
                 if (data.Length > 2)
                 {
-                    item.Durability = data[2];
+                    item.Durability = ItemDatabase.GetItemDurability(data);
                 }
 
                 _items.Add(item);

@@ -2574,10 +2574,7 @@ namespace Client.Main.Controls.UI.Game.Inventory
                 if (ItemGridRenderHelper.ShowsLevelBadge(item))
                 {
                     ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, pixel, font, itemRect, item.Details.Level,
-                                       lvl => lvl >= 9 ? Theme.Danger :
-                                              lvl >= 7 ? Theme.Accent :
-                                              lvl >= 4 ? Theme.Secondary :
-                                              Theme.TextGray,
+                                       _ => ItemGridRenderHelper.LevelBadgeColor(item),
                                        new Color(0, 0, 0, 180));
                 }
 

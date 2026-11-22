@@ -801,10 +801,7 @@ namespace Client.Main.Controls.UI.Game
                 }
 
                 ItemGridRenderHelper.DrawItemLevelBadge(spriteBatch, GraphicsManager.Instance.Pixel, font, rect, ItemGridRenderHelper.ShowsLevelBadge(item) ? item.Details.Level : 0,
-               lvl => lvl >= 9 ? Theme.AccentBright :
-                      lvl >= 7 ? Theme.Accent :
-                      lvl >= 4 ? Theme.AccentDim :
-                      Theme.TextGray,
+               _ => ItemGridRenderHelper.LevelBadgeColor(item),
                new Color(0, 0, 0, 180));
 
                 if (_jewelEntries.Count > 0)
@@ -1081,7 +1078,7 @@ namespace Client.Main.Controls.UI.Game
                 var item = new InventoryItem(def, new Point(gridX, gridY), data);
                 if (data.Length > 2)
                 {
-                    item.Durability = data[2];
+                    item.Durability = ItemDatabase.GetItemDurability(data);
                 }
 
                 _items.Add(item);

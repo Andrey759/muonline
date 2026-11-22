@@ -106,6 +106,17 @@ namespace Client.Main.Controls.UI.Game.Common
             item != null && item.Details.Level > 0 && item.Definition != null &&
             !(item.Definition.BaseDurability == 0 && item.Definition.MagicDurability == 0);
 
+        /// <summary>Level badge colour like the item name: excellent green, ancient blue, +7 and higher gold.</summary>
+        public static Color LevelBadgeColor(InventoryItem item)
+        {
+            if (item == null) return new Color(200, 200, 200);
+            if (item.Details.IsExcellent) return new Color(110, 230, 110);
+            if (item.Details.IsAncient) return new Color(90, 190, 255);
+            return item.Details.Level >= 7 ? new Color(255, 205, 80)
+                : item.Details.Level >= 4 ? new Color(225, 210, 160)
+                : new Color(200, 200, 200);
+        }
+
         public static void DrawItemLevelBadge(SpriteBatch spriteBatch, Texture2D pixel, SpriteFont font, Rectangle rect, int level, Func<int, Color> levelColorSelector, Color shadowColor)
         {
             if (font == null || level <= 0 || pixel == null) return;
