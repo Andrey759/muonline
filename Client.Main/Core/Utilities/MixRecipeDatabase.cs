@@ -147,22 +147,37 @@ namespace Client.Main.Core.Utilities
 
             var mixItems = BuildMixItems(items);
 
-            // 1) Exact match
+            // 1) Exact match. Several recipes can match the same items (item +9 with Chaos, Bless and Soul fits both
+            //    "+10 item" and "Chaos Weapon / 1st Wings"), so the most specific one wins, not the first in mix.bmd.
+            MixRecipe best = null;
+            long bestSlack = long.MaxValue;
             foreach (var recipe in recipes)
             {
                 ResetTestCounts(mixItems);
-                if (CheckRecipeSub(recipe, mixItems, out var evalState))
+                if (CheckRecipeSub(recipe, mixItems, out _))
                 {
-                    var successRate = CalcMixRate(recipe, mixItems, evalState);
-                    var requiredZen = CalcRequiredZen(recipe, successRate);
-                    return new ChaosMixEvaluation
+                    long slack = RecipeSlack(recipe);
+                    if (slack < bestSlack)
                     {
-                        CurrentRecipe = recipe,
-                        MostSimilarRecipe = recipe,
-                        SuccessRate = successRate,
-                        RequiredZen = requiredZen
-                    };
+                        best = recipe;
+                        bestSlack = slack;
+                    }
                 }
+            }
+
+            if (best != null)
+            {
+                ResetTestCounts(mixItems);
+                CheckRecipeSub(best, mixItems, out var evalState);
+                var successRate = CalcMixRate(best, mixItems, evalState);
+                var requiredZen = CalcRequiredZen(best, successRate);
+                return new ChaosMixEvaluation
+                {
+                    CurrentRecipe = best,
+                    MostSimilarRecipe = best,
+                    SuccessRate = successRate,
+                    RequiredZen = requiredZen
+                };
             }
 
             // 2) Similar recipe (best effort)
@@ -744,6 +759,20 @@ namespace Client.Main.Core.Utilities
                 'B' => (uint)(successRate * recipe.RequiredZen),
                 _ => recipe.RequiredZen
             };
+        }
+
+        /// <summary>How loosely a recipe describes its ingredients: free item counts first, then type and level ranges.</summary>
+        private static long RecipeSlack(MixRecipe recipe)
+        {
+            long counts = 0, ranges = 0;
+            for (int i = 0; i < recipe.NumSources && i < recipe.Sources.Length; i++)
+            {
+                var s = recipe.Sources[i];
+                counts += Math.Max(0, s.CountMax - s.CountMin);
+                ranges += Math.Max(0, s.TypeMax - s.TypeMin) + Math.Max(0, s.LevelMax - s.LevelMin);
+            }
+
+            return counts * 1_000_000L + ranges;
         }
 
         private static MixRecipe FindMostSimilarRecipe(IReadOnlyList<MixRecipe> recipes, List<MixItem> mixItems)

@@ -495,11 +495,12 @@ namespace Client.Main.Controllers
             if (volume <= 0f || (throttle && ShouldThrottleOneShot(fullPath, volume))) return;
             try
             {
-                sound.Play(volume, 0f, 0f);
+                if (!sound.Play(volume, 0f, 0f))
+                    _logger?.LogWarning("Sound was not played (no free voice): {Path}", fullPath);
             }
             catch (Exception ex)
             {
-                _logger?.LogDebug(ex, "Unable to play one-shot sound {Path}", fullPath);
+                _logger?.LogWarning(ex, "Unable to play one-shot sound {Path}", fullPath);
             }
         }
 
@@ -619,7 +620,7 @@ namespace Client.Main.Controllers
 
             if (!File.Exists(fullPath))
             {
-                _logger?.LogDebug($"[LoadSoundEffectData] File not found: {fullPath}");
+                _logger?.LogWarning($"[LoadSoundEffectData] File not found: {fullPath}");
                 MarkFailedPath(cacheKey);
                 return null;
             }
@@ -669,7 +670,7 @@ namespace Client.Main.Controllers
             }
             catch (Exception ex)
             {
-                _logger?.LogDebug($"[LoadSoundEffectData] Error loading sound data from '{fullPath}': {ex.Message}");
+                _logger?.LogWarning($"[LoadSoundEffectData] Error loading sound data from '{fullPath}': {ex.Message}");
                 MarkFailedPath(cacheKey);
             }
             return null;

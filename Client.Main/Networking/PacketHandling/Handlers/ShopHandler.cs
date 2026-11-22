@@ -317,15 +317,6 @@ namespace Client.Main.Networking.PacketHandling.Handlers
                 bool toChaosMachine = _lastWindow == NpcWindowResponse.NpcWindow.ChaosMachine || isMixResultList || list.Type == StoreItemList.ItemWindow.ChaosMachine;
                 bool toVault = !toChaosMachine && _lastWindow == NpcWindowResponse.NpcWindow.VaultStorage;
 
-                if (isMixResultList)
-                {
-                    MuGame.ScheduleOnMainThread(() =>
-                    {
-                        SoundController.Instance.PlayBuffer("Sound/eMix.wav");
-                        SoundController.Instance.PlayBuffer("Sound/eBreak.wav");
-                    });
-                }
-
                 if (toChaosMachine)
                 {
                     _characterState.ClearChaosMachineItems();

@@ -189,6 +189,11 @@ namespace Client.Main.Controls.UI.Game
             BringToFront();
             Scene.FocusControl = this;
 
+            // Loaded now, so the working sound starts at once when Mix is pressed.
+            SoundController.Instance.PreloadSound(MixWorkingSound);
+            SoundController.Instance.PreloadSound(MixSuccessSound);
+            SoundController.Instance.PreloadSound(MixFailSound);
+
             _closeRequestSent = false;
             _mixInProgress = false;
             EnsureCharacterState();
@@ -852,6 +857,9 @@ namespace Client.Main.Controls.UI.Game
 
             int mixId = _evaluation.CurrentRecipe.MixId;
             int chance = _evaluation.SuccessRate;
+            _logger?.LogInformation("Chaos mix recipe {MixId} (#{MixIndex}), {Chance}%, items: {Items}", mixId,
+                _evaluation.CurrentRecipe.MixIndex, chance,
+                string.Join("; ", _items.Select(i => $"{i.Definition?.Name} g{i.Definition?.Group}/{i.Definition?.Id} +{i.Details.Level} opt{i.Details.OptionLevel} dur{i.Durability} [{Convert.ToHexString(i.RawData)}]")));
             uint cost = _evaluation.RequiredZen;
 
             string message = $"Proceed with mix?\\nChance: {chance}%\\nCost: {FormatZen(cost)} Zen\\n\\nFailure may destroy items.";
@@ -888,6 +896,7 @@ namespace Client.Main.Controls.UI.Game
                 });
             });
             _mixRefreshPending = false;
+            _logger?.LogInformation("Chaos mix started: recipe {MixId}, working sound {Sound}.", mixId, MixWorkingSound);
             SoundController.Instance.PlayBuffer(MixWorkingSound);
 
             _ = Task.Run(async () =>
@@ -909,7 +918,7 @@ namespace Client.Main.Controls.UI.Game
         private const int MixAnswerTimeoutMs = 15000; // no answer (server restarted, connection lost): unlock the window
         private const string MixWorkingSound = "Sound/nMix.wav";
         private const string MixSuccessSound = "Sound/eMix.wav";
-        private const string MixFailSound = "Sound/iButtonError.wav";
+        private const string MixFailSound = "Sound/eBreak.wav";
         private long _mixStartedAtMs;
         private bool _mixRefreshPending;
 
