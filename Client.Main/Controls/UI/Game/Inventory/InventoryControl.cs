@@ -3293,6 +3293,17 @@ namespace Client.Main.Controls.UI.Game.Inventory
             return ItemGridRenderHelper.GetSlotAtScreenPosition(LayoutRectangle, _gridRect, Columns, Rows, INVENTORY_SQUARE_WIDTH, INVENTORY_SQUARE_HEIGHT, screenPos);
         }
 
+        /// <summary>
+        /// The free equipment slot under the mouse, for items dropped from another window (vault, chaos machine),
+        /// or -1. Whether the item may be worn there is decided by the server.
+        /// </summary>
+        public int GetFreeEquipSlotAtScreenPosition(Point screenPos)
+        {
+            if (!Visible) return -1;
+            int slot = GetEquipSlotAtScreenPosition(screenPos);
+            return slot >= 0 && !_equippedItems.ContainsKey((byte)slot) ? slot : -1;
+        }
+
         private int GetEquipSlotAtScreenPosition(Point screenPos)
         {
             foreach (var layout in _equipSlots.Values)

@@ -1504,6 +1504,11 @@ namespace Client.Main.Controls.UI.Game
                 }
                 dropped = true;
             }
+            else if (inventory != null && inventory.GetFreeEquipSlotAtScreenPosition(mousePos) is int equipSlot && equipSlot >= 0)
+            {
+                MoveItemToInventorySlot((byte)equipSlot, inventory);
+                dropped = true;
+            }
             else if (inventory != null && inventory.Visible && inventory.DisplayRectangle.Contains(mousePos))
             {
                 Point invSlot = inventory.GetSlotAtScreenPositionPublic(mousePos);
@@ -1562,11 +1567,16 @@ namespace Client.Main.Controls.UI.Game
 
         private void MoveItemToInventory(Point targetSlot, InventoryControl inventory)
         {
+            MoveItemToInventorySlot((byte)(InventoryControl.InventorySlotOffsetConstant +
+                                           (targetSlot.Y * InventoryControl.Columns) + targetSlot.X), inventory);
+        }
+
+        /// <summary>Moves the dragged item to an inventory slot; slots 0-11 put it on.</summary>
+        private void MoveItemToInventorySlot(byte toSlot, InventoryControl inventory)
+        {
             if (_draggedItem == null) return;
 
             byte fromSlot = (byte)(_draggedOriginalSlot.Y * Columns + _draggedOriginalSlot.X);
-            byte toSlot = (byte)(InventoryControl.InventorySlotOffsetConstant +
-                                 (targetSlot.Y * InventoryControl.Columns) + targetSlot.X);
 
             var svc = _networkManager?.GetCharacterService();
             var state = _networkManager?.GetCharacterState();

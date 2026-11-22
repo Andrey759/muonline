@@ -153,6 +153,11 @@ namespace Client.Main.Core.Utilities
             long bestSlack = long.MaxValue;
             foreach (var recipe in recipes)
             {
+                if (IsExcludedByChaosWeapon(recipe, mixItems))
+                {
+                    continue;
+                }
+
                 ResetTestCounts(mixItems);
                 if (CheckRecipeSub(recipe, mixItems, out _))
                 {
@@ -775,31 +780,88 @@ namespace Client.Main.Core.Utilities
             return counts * 1_000_000L + ranges;
         }
 
+        private const int ChaosMixIdChaosWeapon = 1;
+        private const int ChaosMixIdFirstWings = 11;
+
+        /// <summary>Chaos Dragon Axe, Chaos Nature Bow and Chaos Lightning Staff.</summary>
+        private static bool IsChaosWeapon(short type) => type is (2 * 512 + 6) or (4 * 512 + 6) or (5 * 512 + 7);
+
+        private static bool IsBlessOrSoul(short type) => type is (14 * 512 + 13) or (14 * 512 + 14);
+
+        /// <summary>
+        /// A chaos weapon selects the mix by the jewels besides it, like the server: without Bless and Soul it's the
+        /// first wings, with them a level upgrade. It's never the material of a new chaos weapon.
+        /// </summary>
+        private static bool IsExcludedByChaosWeapon(MixRecipe recipe, List<MixItem> mixItems)
+        {
+            if (!mixItems.Any(m => IsChaosWeapon(m.Type)))
+            {
+                return false;
+            }
+
+            return recipe.MixId == ChaosMixIdChaosWeapon
+                   || (recipe.MixId == ChaosMixIdFirstWings && mixItems.Any(m => IsBlessOrSoul(m.Type)));
+        }
+
         private static MixRecipe FindMostSimilarRecipe(IReadOnlyList<MixRecipe> recipes, List<MixItem> mixItems)
         {
-            // Simplified similarity: first recipe which shares at least one required source with current items,
-            // otherwise the first recipe.
+            // The recipe which uses most of the items: an item which fits a source scores fully, one which only misses
+            // the level less the further it is off; items the recipe doesn't use and sources nothing fits count against it.
             if (recipes == null || recipes.Count == 0)
             {
                 return null;
             }
 
+            MixRecipe best = null;
+            int bestScore = int.MinValue;
             foreach (var recipe in recipes)
             {
-                for (int j = 0; j < recipe.NumSources && j < recipe.Sources.Length; j++)
+                if (IsExcludedByChaosWeapon(recipe, mixItems))
                 {
-                    var req = recipe.Sources[j];
-                    for (int i = 0; i < mixItems.Count; i++)
+                    continue;
+                }
+
+                int sources = Math.Min(recipe.NumSources, recipe.Sources.Length);
+                int score = 0;
+                foreach (var item in mixItems)
+                {
+                    int itemScore = -30;
+                    for (int j = 0; j < sources; j++)
                     {
-                        if (CheckItem(req, mixItems[i]))
+                        var req = recipe.Sources[j];
+                        if (CheckItem(req, item))
                         {
-                            return recipe;
+                            itemScore = 100;
+                            break;
+                        }
+
+                        if (CheckItem(req with { LevelMin = 0, LevelMax = 255 }, item))
+                        {
+                            int distance = item.Level < req.LevelMin ? req.LevelMin - item.Level : item.Level - req.LevelMax;
+                            itemScore = Math.Max(itemScore, 60 - Math.Min(50, distance * 5));
                         }
                     }
+
+                    score += itemScore;
+                }
+
+                for (int j = 0; j < sources; j++)
+                {
+                    var req = recipe.Sources[j];
+                    if (!IsOptionItem(req) && !mixItems.Any(m => CheckItem(req with { LevelMin = 0, LevelMax = 255 }, m)))
+                    {
+                        score -= 20;
+                    }
+                }
+
+                if (score > bestScore)
+                {
+                    best = recipe;
+                    bestScore = score;
                 }
             }
 
-            return recipes[0];
+            return best ?? recipes[0];
         }
 
         private static uint EvaluateMixItemValue(short type, InventoryItem item)
