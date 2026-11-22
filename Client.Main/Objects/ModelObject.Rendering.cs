@@ -748,9 +748,9 @@ namespace Client.Main.Objects
                 {
                     const float scaleHighlight = 0.015f;
                     const float scaleFactor = 1f + scaleHighlight;
-                    highlightMatrix = Matrix.CreateScale(scaleFactor) *
+                    highlightMatrix = PushHighlightBehind(Matrix.CreateScale(scaleFactor) *
                                       Matrix.CreateTranslation(-scaleHighlight, -scaleHighlight, -scaleHighlight) *
-                                      worldPos;
+                                      worldPos);
                     highlightColor = this is MonsterObject ? _redHighlight : _greenHighlight;
                 }
 
@@ -776,13 +776,7 @@ namespace Client.Main.Objects
                         ref drewBlobShadow);
 
                     if (highlightAllowed)
-                    {
-                        foreach (var kvp in GroupMeshesByState(false))
-                        {
-                            if (kvp.Value.Count > 0)
-                                DrawMeshesHighlight(kvp.Value, highlightMatrix, highlightColor);
-                        }
-                    }
+                        DrawObjectHighlight(GroupMeshesByState(false), highlightMatrix, highlightColor);
                 }
             }
 
@@ -911,9 +905,9 @@ namespace Client.Main.Objects
             {
                 const float scaleHighlight = 0.015f;
                 const float scaleFactor = 1f + scaleHighlight;
-                highlightMatrix = Matrix.CreateScale(scaleFactor) *
+                highlightMatrix = PushHighlightBehind(Matrix.CreateScale(scaleFactor) *
                     Matrix.CreateTranslation(-scaleHighlight, -scaleHighlight, -scaleHighlight) *
-                    worldPos;
+                    worldPos);
                 highlightColor = this is MonsterObject ? _redHighlight : _greenHighlight;
             }
 
@@ -946,14 +940,11 @@ namespace Client.Main.Objects
                 }
 
                 // The hover highlight is decided and drawn once for the whole object, under its meshes.
+                // The enlarged copy reads as a thin outline only around solid volumes; flat two-sided or
+                // additive parts (wings, aprons) become a filled surface, so they are left out when the model
+                // has solid parts to outline.
                 if (highlightAllowed)
-                {
-                    foreach (var kvp in meshGroups)
-                    {
-                        if (kvp.Value.Count > 0)
-                            DrawMeshesHighlight(kvp.Value, highlightMatrix, highlightColor);
-                    }
-                }
+                    DrawObjectHighlight(meshGroups, highlightMatrix, highlightColor);
 
                 foreach (var kvp in meshGroups)
                 {
@@ -1555,6 +1546,48 @@ namespace Client.Main.Objects
             // duplicating animation, uploads and draw calls for every walker.
             return true;
         }
+
+        /// <summary>
+        /// Moves the enlarged highlight copy a little away from the camera. Enlarging pushes parts which stand out
+        /// in front (aprons, wings) before the model itself, where they were filled completely; behind the model the
+        /// copy shows only around the silhouette, as a thin outline.
+        /// </summary>
+        private Matrix PushHighlightBehind(Matrix highlightMatrix)
+        {
+            Vector3 toObject = highlightMatrix.Translation - Camera.Instance.Position;
+            if (toObject.LengthSquared() < 1f)
+                return highlightMatrix;
+
+            var bounds = BoundingBoxWorld;
+            float size = Vector3.Distance(bounds.Min, bounds.Max);
+            float distance = MathHelper.Clamp(size * 0.02f, 2f, 20f);
+            toObject.Normalize();
+            return highlightMatrix * Matrix.CreateTranslation(toObject * distance);
+        }
+
+        private void DrawObjectHighlight(Dictionary<MeshStateKey, List<int>> meshGroups, Matrix highlightMatrix, Vector3 highlightColor)
+        {
+            bool anySolid = false;
+            foreach (var kvp in meshGroups)
+            {
+                if (kvp.Value.Count > 0 && IsSolidHighlightGroup(kvp.Key))
+                {
+                    anySolid = true;
+                    break;
+                }
+            }
+
+            foreach (var kvp in meshGroups)
+            {
+                if (kvp.Value.Count > 0 && (!anySolid || IsSolidHighlightGroup(kvp.Key)))
+                    DrawMeshesHighlight(kvp.Value, highlightMatrix, highlightColor);
+            }
+        }
+
+        private static bool IsSolidHighlightGroup(in MeshStateKey key) =>
+            !key.TwoSided &&
+            (key.BlendState == null || ReferenceEquals(key.BlendState, BlendState.Opaque) ||
+             ReferenceEquals(key.BlendState, BlendState.AlphaBlend) || ReferenceEquals(key.BlendState, BlendState.NonPremultiplied));
 
         private void DrawMeshesHighlight(List<int> meshIndices, Matrix highlightMatrix, Vector3 highlightColor)
         {

@@ -190,7 +190,7 @@ namespace Client.Main.Controls.UI.Game
             Scene.FocusControl = this;
 
             // Loaded now, so the working sound starts at once when Mix is pressed.
-            SoundController.Instance.PreloadSound(MixWorkingSound);
+            _ = Task.Run(() => SoundController.Instance.GetAmplifiedSoundEffect(System.IO.Path.Combine(Constants.DataPath, MixWorkingSound), MixWorkingSoundGain));
             SoundController.Instance.PreloadSound(MixSuccessSound);
             SoundController.Instance.PreloadSound(MixFailSound);
 
@@ -898,7 +898,7 @@ namespace Client.Main.Controls.UI.Game
             });
             _mixRefreshPending = false;
             StopWorkingSound();
-            _workingSound = SoundController.Instance.PlayOwnedInstance(MixWorkingSound);
+            _workingSound = SoundController.Instance.PlayOwnedInstance(MixWorkingSound, MixWorkingSoundGain);
             _logger?.LogInformation("Chaos mix started: recipe {MixId}, working sound {Sound}: {State}.", mixId, MixWorkingSound,
                 _workingSound?.State.ToString() ?? "not loaded");
             var startedSound = _workingSound;
@@ -927,6 +927,7 @@ namespace Client.Main.Controls.UI.Game
         private const int MixDurationMs = 4200;   // length of nMix.wav (4.26 s)
         private const int MixAnswerTimeoutMs = 15000; // no answer (server restarted, connection lost): unlock the window
         private const string MixWorkingSound = "Sound/nMix.wav";
+        private const float MixWorkingSoundGain = 3f; // nMix is about 3 times quieter than eMix (peak 5772 of 32767)
         private const string MixSuccessSound = "Sound/eMix.wav";
         private const string MixFailSound = "Sound/eBreak.wav";
         private long _mixStartedAtMs;

@@ -390,15 +390,16 @@ namespace Client.Main.Controllers
         /// Plays a loaded sound on its own instance, which the caller keeps and may stop. Returns null (and starts
         /// loading) when the sound is not in the cache yet.
         /// </summary>
-        public SoundEffectInstance PlayOwnedInstance(string relativePath)
+        public SoundEffectInstance PlayOwnedInstance(string relativePath, float gain = 1f)
         {
             if (_disposed || !Constants.SOUND_EFFECTS || Constants.SOUND_EFFECTS_VOLUME <= 0 || string.IsNullOrEmpty(relativePath)) return null;
 
             string fullPath = Path.Combine(Constants.DataPath, relativePath);
-            SoundEffect cached = GetCachedSoundEffect(fullPath.ToLowerInvariant());
+            SoundEffect cached = gain != 1f ? GetAmplifiedSoundEffect(fullPath, gain) : GetCachedSoundEffect(fullPath.ToLowerInvariant());
             if (cached == null || cached.IsDisposed)
             {
-                _ = LoadSoundEffectDataAsync(fullPath);
+                if (gain == 1f)
+                    _ = LoadSoundEffectDataAsync(fullPath);
                 return null;
             }
 
@@ -412,6 +413,71 @@ namespace Client.Main.Controllers
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "Unable to play sound {Path}", fullPath);
+                return null;
+            }
+        }
+
+        private readonly Dictionary<string, SoundEffect> _amplifiedSounds = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// A 16-bit PCM wave with its samples multiplied by <paramref name="gain"/> (clamped), for quiet originals
+        /// which are lost under the music at a low effects volume. Built once and cached.
+        /// </summary>
+        public SoundEffect GetAmplifiedSoundEffect(string fullPath, float gain)
+        {
+            string key = $"{fullPath}|{gain:0.##}";
+            lock (_soundCacheLock)
+            {
+                if (_amplifiedSounds.TryGetValue(key, out var existing) && existing != null && !existing.IsDisposed)
+                    return existing;
+            }
+
+            try
+            {
+                byte[] wav = File.ReadAllBytes(fullPath);
+                int channels = 0, sampleRate = 0, bits = 0, dataOffset = -1, dataLength = 0;
+                for (int pos = 12; pos + 8 <= wav.Length;)
+                {
+                    string id = System.Text.Encoding.ASCII.GetString(wav, pos, 4);
+                    int size = BitConverter.ToInt32(wav, pos + 4);
+                    if (id == "fmt ")
+                    {
+                        channels = BitConverter.ToInt16(wav, pos + 10);
+                        sampleRate = BitConverter.ToInt32(wav, pos + 12);
+                        bits = BitConverter.ToInt16(wav, pos + 22);
+                    }
+                    else if (id == "data")
+                    {
+                        dataOffset = pos + 8;
+                        dataLength = Math.Min(size, wav.Length - dataOffset) & ~1;
+                        break;
+                    }
+                    pos += 8 + size + (size & 1);
+                }
+
+                if (dataOffset < 0 || bits != 16 || channels is < 1 or > 2 || sampleRate <= 0)
+                {
+                    _logger?.LogWarning("Sound {Path} is not 16-bit PCM, played without amplification.", fullPath);
+                    return GetCachedSoundEffect(fullPath.ToLowerInvariant());
+                }
+
+                var pcm = new byte[dataLength];
+                for (int i = 0; i < dataLength; i += 2)
+                {
+                    int v = (int)(BitConverter.ToInt16(wav, dataOffset + i) * gain);
+                    short s = (short)Math.Clamp(v, short.MinValue, short.MaxValue);
+                    pcm[i] = (byte)s;
+                    pcm[i + 1] = (byte)(s >> 8);
+                }
+
+                var effect = new SoundEffect(pcm, sampleRate, (AudioChannels)channels);
+                lock (_soundCacheLock)
+                    _amplifiedSounds[key] = effect;
+                return effect;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Unable to amplify sound {Path}", fullPath);
                 return null;
             }
         }
